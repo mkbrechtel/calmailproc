@@ -1,0 +1,229 @@
+Return-Path: <brechtel@med.uni-frankfurt.de>
+Delivered-To: brechtel
+Received: from dovecot-director-3.cluster.uni-frankfurt.de ([10.1.1.92])
+	by blade5e.rz.uni-frankfurt.de with LMTP
+	id aD9QEsRSz2evZSUAQ33LqA
+	(envelope-from <brechtel@med.uni-frankfurt.de>)
+	for <brechtel>; Mon, 10 Mar 2025 21:59:48 +0100
+Received: from dovecot-director-3.cluster.uni-frankfurt.de
+	by dovecot-director-3.cluster.uni-frankfurt.de with LMTP
+	id mOUzEsRSz2c5fSEAIw8KAw
+	(envelope-from <brechtel@med.uni-frankfurt.de>)
+	for <brechtel@med.uni-frankfurt.de>; Mon, 10 Mar 2025 21:59:48 +0100
+Received: from webmail.server.uni-frankfurt.de ([141.2.22.86] helo=horde5.cluster.uni-frankfurt.de)
+	by dovecot-director-3.cluster.uni-frankfurt.de with esmtp (Exim 4.98.1)
+	(envelope-from <brechtel@med.uni-frankfurt.de>)
+	id 1trkE0-00000009K3T-0ydL
+	for brechtel@med.uni-frankfurt.de;
+	Mon, 10 Mar 2025 21:59:48 +0100
+Received: from [127.0.0.1] (helo=rz.uni-frankfurt.de)
+	by horde5.cluster.uni-frankfurt.de with esmtp (Exim 4.97.1)
+	(envelope-from <brechtel@med.uni-frankfurt.de>)
+	id 1trkDz-000000006uv-2hYY
+	for brechtel@med.uni-frankfurt.de;
+	Mon, 10 Mar 2025 21:59:47 +0100
+Subject: Test 4
+To: brechtel@med.uni-frankfurt.de
+From: Markus Katharina Brechtel <brechtel@med.uni-frankfurt.de>
+User-Agent: Kronolith H5 (4.2.29)
+Message-ID: <20250310215947.Horde.W25bPQa4B6wXkxhUQ7lb1CK@webmail.uni-frankfurt.de>
+Date: Mon, 10 Mar 2025 21:59:47 +0100
+Content-Type: multipart/mixed; boundary="=_NaouhHEEtX1eJ4LKg-01LhD"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+
+This message is in MIME format.
+
+--=_NaouhHEEtX1eJ4LKg-01LhD
+Content-Type: multipart/alternative; boundary="=_OtC1MADOQ6z5uvGAqL86hH7"
+Content-Transfer-Encoding: 8bit
+
+This message is in MIME format.
+
+--=_OtC1MADOQ6z5uvGAqL86hH7
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+
+Test 4 (am 20.03.2025 um 01:00:00)
+
+
+Teilnehmer: markus.brechtel@uk-koeln.de, brechtel@med.uni-frankfurt.de
+
+Im Anhang befindet sich eine iCalendar-Datei mit mehr Informationen zu diesem Termin. Wenn Ihr E-Mail-Programm iTip-Anfragen beherrscht, können Sie diese Datei dazu benutzen, Ihre lokale Version des Termins zu aktualisieren.
+
+Falls Ihr E-Mail-Programm keine iTip-Anfragen unterstützt, können Sie einen der folgenden Links verwenden, um den Termin zu bestätigen oder abzulehnen.
+
+Um den Termin zu bestätigen:
+https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&e=x6wWFHsocTVboCMqAB36QcQ&u=brechtel%40med.uni-frankfurt.de&a=accept
+
+Um den Termin unter Vorbehalt zu bestätigen:
+https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&e=x6wWFHsocTVboCMqAB36QcQ&u=brechtel%40med.uni-frankfurt.de&a=tentative
+
+Um den Termin abzulehnen:
+https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&e=x6wWFHsocTVboCMqAB36QcQ&u=brechtel%40med.uni-frankfurt.de&a=decline
+
+--=_OtC1MADOQ6z5uvGAqL86hH7
+Content-Type: multipart/related; boundary="=_VzLNbgsnblKuofhO_QVJ0L9";
+ start="JWJwjH9KMdMPGgWQni38_R8@horde5.cluster.uni-frankfurt.de"
+Content-Transfer-Encoding: 8bit
+
+This message is in MIME format.
+
+--=_VzLNbgsnblKuofhO_QVJ0L9
+Content-Type: text/html; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+Content-ID: <JWJwjH9KMdMPGgWQni38_R8@horde5.cluster.uni-frankfurt.de>
+
+<p><font size="4"><strong>Markus Katharina Brechtel möchte Sie auf &quot;Test 4&quot; aufmerksam machen.</strong></font></p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0"><tr>
+  <td width="140" valign="top">
+    <img src="cid:Cy-SAfD3F-wAQdqEZmPykC5@horde5.cluster.uni-frankfurt.de" />
+  </td>
+  <td valign="top">
+    <table width="100%" border="0" cellpadding="5" cellspacing="0">
+      <thead><tr>
+        <th colspan="3" align="left"><font size="3"><strong>Test 4</strong></font></th>
+      </tr></thead>
+      <tbody>
+        
+        <tr bgcolor="#f1f1f1">
+          <td nowrap="nowrap" align="right">
+            <font size="2"><strong>Beginn:</strong></font>
+          </td>
+          <td width="5">&nbsp;</td>
+          <td width="100%"><font size="2"><strong>20.03.2025 01:00:00</strong></font></td>
+        </tr>
+        <tr>
+          <td nowrap="nowrap" align="right">
+            <font size="2"><strong>Ende:</strong></font>
+          </td>
+          <td width="5">&nbsp;</td>
+          <td width="100%"><font size="2"><strong>20.03.2025 02:00:00</strong></font></td>
+        </tr>
+                
+        <tr bgcolor="#f1f1f1">
+          <td nowrap="nowrap" align="right" valign="top">
+            <font size="2"><strong>Teilnehmer:</strong></font>
+          </td>
+          <td width="5">&nbsp;</td>
+          <td width="100%"><font size="2"><strong>
+                                    markus.brechtel@uk-koeln.de<br />
+                                                 brechtel@med.uni-frankfurt.de<br />
+                        
+          </strong></font></td>
+        </tr>
+        
+        
+      </tbody>
+    </table>
+  </td>
+</tr></table>
+
+<p><font size="2">Im Anhang befindet sich eine iCalendar-Datei mit mehr Informationen zu diesem Termin. Wenn Ihr E-Mail-Programm iTip-Anfragen beherrscht, können Sie diese Datei dazu benutzen, Ihre lokale Version des Termins zu aktualisieren.</font></p>
+
+<p><font size="2">Falls Ihr E-Mail-Programm keine iTip-Anfragen unterstützt, können Sie die folgenden Links verwenden, um den Termin: <strong><a href="https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&amp;e=x6wWFHsocTVboCMqAB36QcQ&amp;u=brechtel%40med.uni-frankfurt.de&amp;a=accept">zu bestätigen</a></strong>, <strong><a href="https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&amp;e=x6wWFHsocTVboCMqAB36QcQ&amp;u=brechtel%40med.uni-frankfurt.de&amp;a=tentative">unter Vorbehalt zu bestätigen</a></strong> oder <strong><a href="https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&amp;e=x6wWFHsocTVboCMqAB36QcQ&amp;u=brechtel%40med.uni-frankfurt.de&amp;a=decline">abzulehnen</a></strong>.</font></p>
+
+--=_VzLNbgsnblKuofhO_QVJ0L9
+Content-Type: image/png
+Content-Disposition: attachment
+Content-Transfer-Encoding: base64
+Content-ID: <Cy-SAfD3F-wAQdqEZmPykC5@horde5.cluster.uni-frankfurt.de>
+
+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
+JRr9BtId2UJuUp+KAAAAAElFTkSuQmCC
+--=_VzLNbgsnblKuofhO_QVJ0L9--
+
+--=_OtC1MADOQ6z5uvGAqL86hH7
+Content-Type: text/calendar; charset=utf-8; name=event-invitation.ics;
+ METHOD=REQUEST
+Content-Disposition: attachment; filename=event-invitation.ics
+
+BEGIN:VCALENDAR
+VERSION:2.0
+METHOD:REQUEST
+X-WR-CALNAME:Arbeitskalender von MK Brechtel
+PRODID:-//The Horde Project//Horde iCalendar Library//EN
+BEGIN:VEVENT
+DTSTART:20250320T000000Z
+DTEND:20250320T010000Z
+DTSTAMP:20250310T205946Z
+UID:20250310215946.axX7omDXW0OizUH9oNwYJiw@webmail.uni-frankfurt.de
+CREATED:20250310T205946Z
+LAST-MODIFIED:20250310T205946Z
+SUMMARY:Test 4
+ORGANIZER;CN=Markus Katharina Brechtel:mailto:brechtel@med.uni-frankfurt.de
+CLASS:PUBLIC
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:markus
+ .brechtel@uk-koeln.de
+ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:brecht
+ el@med.uni-frankfurt.de
+END:VEVENT
+END:VCALENDAR
+
+--=_OtC1MADOQ6z5uvGAqL86hH7--
+
+--=_NaouhHEEtX1eJ4LKg-01LhD
+Content-Type: application/ics; name=event-invitation.ics; METHOD=REQUEST
+Content-Disposition: attachment; filename=event-invitation.ics
+Content-Transfer-Encoding: base64
+
+QkVHSU46VkNBTEVOREFSDQpWRVJTSU9OOjIuMA0KTUVUSE9EOlJFUVVFU1QNClgtV1ItQ0FMTkFN
+RTpBcmJlaXRza2FsZW5kZXIgdm9uIE1LIEJyZWNodGVsDQpQUk9ESUQ6LS8vVGhlIEhvcmRlIFBy
+b2plY3QvL0hvcmRlIGlDYWxlbmRhciBMaWJyYXJ5Ly9FTg0KQkVHSU46VkVWRU5UDQpEVFNUQVJU
+OjIwMjUwMzIwVDAwMDAwMFoNCkRURU5EOjIwMjUwMzIwVDAxMDAwMFoNCkRUU1RBTVA6MjAyNTAz
+MTBUMjA1OTQ2Wg0KVUlEOjIwMjUwMzEwMjE1OTQ2LmF4WDdvbURYVzBPaXpVSDlvTndZSml3QHdl
+Ym1haWwudW5pLWZyYW5rZnVydC5kZQ0KQ1JFQVRFRDoyMDI1MDMxMFQyMDU5NDZaDQpMQVNULU1P
+RElGSUVEOjIwMjUwMzEwVDIwNTk0NloNClNVTU1BUlk6VGVzdCA0DQpPUkdBTklaRVI7Q049TWFy
+a3VzIEthdGhhcmluYSBCcmVjaHRlbDptYWlsdG86YnJlY2h0ZWxAbWVkLnVuaS1mcmFua2Z1cnQu
+ZGUNCkNMQVNTOlBVQkxJQw0KU1RBVFVTOkNPTkZJUk1FRA0KVFJBTlNQOk9QQVFVRQ0KQVRURU5E
+RUU7Uk9MRT1SRVEtUEFSVElDSVBBTlQ7UEFSVFNUQVQ9TkVFRFMtQUNUSU9OO1JTVlA9VFJVRTpt
+YWlsdG86bWFya3VzDQogLmJyZWNodGVsQHVrLWtvZWxuLmRlDQpBVFRFTkRFRTtST0xFPVJFUS1Q
+QVJUSUNJUEFOVDtQQVJUU1RBVD1ORUVEUy1BQ1RJT047UlNWUD1UUlVFOm1haWx0bzpicmVjaHQN
+CiBlbEBtZWQudW5pLWZyYW5rZnVydC5kZQ0KRU5EOlZFVkVOVA0KRU5EOlZDQUxFTkRBUg0K
+--=_NaouhHEEtX1eJ4LKg-01LhD--

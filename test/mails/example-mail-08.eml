@@ -1,0 +1,103 @@
+Return-Path: <markus.brechtel@uk-koeln.de>
+Delivered-To: brechtel
+Received: from dovecot-director-2.cluster.uni-frankfurt.de ([10.1.1.91])
+	by blade5e.rz.uni-frankfurt.de with LMTP
+	id sMdhEv8tz2dLDCMAQ33LqA
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	for <brechtel>; Mon, 10 Mar 2025 19:22:55 +0100
+Received: from dovecot-director-2.cluster.uni-frankfurt.de
+	by dovecot-director-2.cluster.uni-frankfurt.de with LMTP
+	id KD5LEv8tz2eRHyEAHE6YBw
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	for <brechtel@med.uni-frankfurt.de>; Mon, 10 Mar 2025 19:22:55 +0100
+Received: from lb-mail-36-226.rz.uni-frankfurt.de ([141.2.36.226] helo=mx-2.cluster.uni-frankfurt.de)
+	by dovecot-director-2.cluster.uni-frankfurt.de with esmtps  (TLS1.3) tls TLS_AES_256_GCM_SHA384
+	(Exim 4.98.1)
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	id 1trhmB-00000009BgR-14HU
+	for brechtel@med.uni-frankfurt.de;
+	Mon, 10 Mar 2025 19:22:55 +0100
+Received: from mail-out-v1.uni-koeln.de ([134.95.86.58])
+	by mx-2.cluster.uni-frankfurt.de with esmtps  (TLS1.2) tls TLS_DHE_RSA_WITH_AES_256_GCM_SHA384
+	(Exim 4.98)
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	id 1trhlv-00000005PEt-3BQE
+	for brechtel@med.uni-frankfurt.de;
+	Mon, 10 Mar 2025 19:22:39 +0100
+X-CSE-ConnectionGUID: 7Jb2RxqDQ+e394BmStRgbg==
+X-CSE-MsgGUID: +NKrFRJ9SbmNqo0wDgASIg==
+X-IPAS-Result: =?us-ascii?q?A+AKQwBRLc9n/wCiACoSAIIYWhoBAQEBATwBAQEBAgIBA?=
+ =?us-ascii?q?QEBAgEBAQEDAQEBARWBVYFaAgEBAQEBOYMmhgOTfY4/jWsTDwEPAQEUMAQBA?=
+ =?us-ascii?q?YR+iyQoSwECBAEBAQEDAgMBAQEBAQEBAQEBAQsBAQYBAQEBAQEGBYEhhTVTh?=
+ =?us-ascii?q?npyAX8nBBuCIliCZbBXgTSBAYQzSdk4gW6BRgMBAQEBAQGFZYJjAYR7hh2BV?=
+ =?us-ascii?q?USEDwGBcgGKAQSCL4UnqRosgSF4LAEPETUTFwsHBYFsAyo0MYFGeoJDaUk6A?=
+ =?us-ascii?q?g0CNYIbJFiCK4RNhDyEQYVQghGCBYkthGQuMh1AAwsHZj03FBsGAgGBNc5no?=
+ =?us-ascii?q?T40B4I4gWaBXQYMn2EuF4NwAZNVDpMDhj6SQCKoZwIEAgQFAhYBg3xNJIM3U?=
+ =?us-ascii?q?RcCD444ylWBNAIHCwEBAwmQSAGBHAEB?=
+IronPort-Data: A9a23:ux4DH6+ISO4VHPWineoqDrUD43+TJUtcMsCJ2f8bNWPcYEJGY0x3z
+ zAaWGqDb6nYY2bycox3bo+3/UlQv8TcnIRrQApq+ChEQiMRo6IpJzg7wmTYZHrOc5KZHCqLy
+ +1EN7Es+ehtFie0Si+Fa+an9T8kk/nVGtIQMcacUghpXwhoVSw9vhxqnu89k+ZAjMOwa++3k
+ YqaT/b3Zhn8h1aYDkpOs/je8Eg25Kyr0N8llgVWic5j7Ae2e0Y9VPrzFYnpR1PkT49dGPKNR
+ uqr5NmR4mPD8h4xPcium7D9f1diaua60d+m0yc+twCK23CulwRqukoJHKN0hXR/111lq+tMJ
+ OBl7vRcf+uI0prkw4zxWzEAe8130DYvFLXveRBTuuTLp6HKnueFL/hGVCkL0YMkFulfXkNEr
+ 8YIMRw0LR3Y1r6cxYmncOZmiZF2RCXrFNt3VnBI1jTFFbMhXIyGWaWVo8VCznEtgMELHvHTY
+ 8xfZTcHgBboORQXYgUeUspmzr/63yOtIWQB+Dp5poJui4TX5Al4yrvwK5zfYNGBRdlYmm6Fp
+ SfF+Gn9BFcWObRzzBLVryj13bCU9c/9cME0N6eWzNw7u1eW4HUUUAI6WnKAgPbs3yZSXPoac
+ ST44BEGp7I//0y3Q93VWhC05mOCv1sSQdNWEOMn8h3Lxqe83uqCLnMBUiYEb8E68dU2Gnowz
+ E3PgtXoQD9ovbmTD36QnluJkQ6P1eEuBTdqTUc5ocEturEPfKlbYsrzc+te
+IronPort-HdrOrdr: A9a23:/0SXv6ANuIM9jYzlHem755DYdb4zR+YMi2TDtnoBKyC9F/by/f
+ xG88536faKskd1ZJhNo7y90cq7MBDhHPxOgLX5VI3KNDUO3lHGEGgI1+vfKlPbdREW/9QtsZ
+ tdTw==
+X-Talos-CUID: =?us-ascii?q?9a23=3AfVoQlWmNWpYxlnGMr2fz6nTGdcPXOSL/xi3qM1a?=
+ =?us-ascii?q?UMCVkE+zJY1qr5JlrmcU7zg=3D=3D?=
+X-Talos-MUID: 9a23:rHp8OAnIIZqujUQU8mY7dnohEuRyzZ6MWXsHlLMfvJGbGSNZABaS2WE=
+X-IronPort-Anti-Spam-Filtered: true
+X-IronPort-AV: E=Sophos;i="6.14,236,1736809200"; 
+   d="scan'208";a="8521373"
+Received: from smtp-out-rh7.rrz.uni-koeln.de ([IPv6:2a00:a200:0:12::118])
+  by mail-out-v1.uni-koeln.de with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384; 10 Mar 2025 19:22:39 +0100
+Received: from smtp.uni-koeln.de (msa-node1-rh7.rrz.uni-koeln.de [IPv6:2a00:a200:0:15::202])
+	by smtp-out.rrz.uni-koeln.de (8.14.7/8.14.7) with ESMTP id 52AIMcKr026950
+	for <brechtel@med.uni-frankfurt.de>; Mon, 10 Mar 2025 19:22:38 +0100
+Received: from mail-gw.uk-koeln.de (mail-gw.uk-koeln.de [134.95.33.33])
+	by smtp.uni-koeln.de (8.14.7/8.14.7) with ESMTP id 52AIMcPp073002
+	(version=TLSv1/SSLv3 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NOT)
+	for <brechtel@med.uni-frankfurt.de>; Mon, 10 Mar 2025 19:22:38 +0100
+Received: from w-exch-db02.ads.uk-koeln.de ([134.95.197.234]:14834 helo=owa.uk-koeln.de)
+	by mail-gw.uk-koeln.de with esmtps  (TLS1.2) tls TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+	(Exim 4.96)
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	id 1trhll-000000004WN-17hv
+	for brechtel@med.uni-frankfurt.de;
+	Mon, 10 Mar 2025 19:22:29 +0100
+Received: from W-EXCH-DB02.ADS.UK-KOELN.DE (134.95.197.234) by
+ W-EXCH-DB02.ADS.UK-KOELN.DE (134.95.197.234) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id
+ 15.1.2507.39; Mon, 10 Mar 2025 19:22:28 +0100
+Received: from W-EXCH-DB02.ADS.UK-KOELN.DE ([fe80::a102:8171:65d2:3894]) by
+ W-EXCH-DB02.ADS.UK-KOELN.DE ([fe80::a102:8171:65d2:3894%3]) with mapi id
+ 15.01.2507.039; Mon, 10 Mar 2025 19:22:28 +0100
+From: Markus Brechtel <markus.brechtel@uk-koeln.de>
+To: "'brechtel@med.uni-frankfurt.de'" <brechtel@med.uni-frankfurt.de>
+Subject: No calendar event here
+Thread-Topic: No calendar event here
+Thread-Index: AQHbkelXoldjlK8Gr0SWDxbJfCh0Gw==
+Date: Mon, 10 Mar 2025 18:22:28 +0000
+Message-ID: <af4b860383c3459ba9f36cb8b43a8874@uk-koeln.de>
+Accept-Language: de-DE, en-US
+Content-Language: de-DE
+X-MS-Has-Attach:
+X-MS-TNEF-Correlator:
+x-originating-ip: [134.95.33.58]
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+MIME-Version: 1.0
+X-Scanned-By: MIMEDefang 3.3
+X-MailScanner-Information: Please contact the ISP for more information
+X-MailScanner-ID: 1trhlv-00000005PEt-3BQE
+X-MailScanner: Found to be clean
+X-MailScanner-SpamCheck: not spam, SpamAssassin (Wertung=-1.879, benoetigt 4,
+	autolearn=not spam, BAYES_00 -1.90, DMARC_MISSING 0.00,
+	EMPTY_MESSAGE 2.32, RCVD_IN_DNSWL_MED -2.30, SPF_HELO_NONE 0.00,
+	SPF_PASS -0.00)
+X-MailScanner-From: markus.brechtel@uk-koeln.de

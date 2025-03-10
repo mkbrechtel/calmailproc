@@ -1,0 +1,344 @@
+X-Mozilla-Status: 0001
+X-Mozilla-Status2: 00000000
+Received: from W-EXCH-BKUP02.ADS.UK-KOELN.DE (134.95.197.240) by
+ W-EXCH-DB02.ADS.UK-KOELN.DE (134.95.197.234) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id
+ 15.1.2507.39 via Mailbox Transport; Mon, 10 Mar 2025 21:59:55 +0100
+Received: from W-EXCH-DB01.ADS.UK-KOELN.DE (134.95.197.233) by
+ W-EXCH-BKUP02.ADS.UK-KOELN.DE (134.95.197.240) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id
+ 15.1.2507.39; Mon, 10 Mar 2025 21:59:55 +0100
+Received: from mail-gw.uk-koeln.de (134.95.33.33) by owa.uk-koeln.de
+ (134.95.197.233) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id 15.1.2507.39 via Frontend
+ Transport; Mon, 10 Mar 2025 21:59:55 +0100
+Received: from uzk-mail-in-v1.rrz.uni-koeln.de ([134.95.63.200]:28245)
+	by mail-gw.uk-koeln.de with esmtps  (TLS1.2) tls TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+	(Exim 4.96)
+	(envelope-from <prvs=1164869536=brechtel@med.uni-frankfurt.de>)
+	id 1trkE0-000000001MI-3620
+	for markus.brechtel@uk-koeln.de;
+	Mon, 10 Mar 2025 21:59:48 +0100
+X-CSE-ConnectionGUID: 4U30n41aSwSD+EdOuQH5BA==
+X-CSE-MsgGUID: 2MwJ26ImQ2SOoeq48ds8wA==
+Authentication-Results: medi-v1.rrz.uni-koeln.de; spf=Pass smtp.mailfrom=prvs=1164869536=brechtel@med.uni-frankfurt.de
+Received-SPF: Pass (medi-v1.rrz.uni-koeln.de: domain of
+  prvs=1164869536=brechtel@med.uni-frankfurt.de designates
+  141.2.22.115 as permitted sender) identity=mailfrom;
+  client-ip=141.2.22.115; receiver=medi-v1.rrz.uni-koeln.de;
+  envelope-from="prvs=1164869536=brechtel@med.uni-frankfurt.de";
+  x-sender="prvs=1164869536=brechtel@med.uni-frankfurt.de";
+  x-conformance=spf_only; x-record-type="v=spf1";
+  x-record-text="v=spf1 ip4:141.2.22.115 ip4:141.2.22.185
+  ip4:141.2.22.204 ip4:141.2.22.205 ip4:141.2.22.206
+  ip4:141.2.22.231 ip4:141.2.22.232 ip4:141.2.22.233
+  ip4:141.2.22.92 ip4:141.2.22.192 ip4:141.2.42.47 -all"
+IronPort-SDR: 67cf52c3_cua+9r6k0Ok7W7kiPNDRSJubzvtKAm/MiFay0CiPgOBGFU7
+ CpKJfMS94hu+DsyZ9rP41M0yba1ctRgTMdbljvg==
+IronPort-Data: A9a23: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
+ lKETlE9
+IronPort-HdrOrdr: A9a23:/BRBJaGHUixgdWbkpLqEFMeALOsnbusQ8zAXPhhKOGFom7+j5r
+ yTdZUgpG7JYVkqKQgdcLy7Scu9qDbnhORICOoqTMeftWvdyROVxehZhOOIqVOAe1ycygce79
+ YaT0EUMqyVMbEOt7ed3ODOKadG/DDoytHMuc7ui11WYUVBbaZm4w1lCgCdPHFXaWB9aKYRJd
+ 633OYCgyCvV0g2Q62AakXtWdKtmzSBruOYXfdPPW9Y1DWz
+X-Talos-CUID: 9a23:QXzxtGAmBxCZWDz6E3VarxYSRpksSWLm4DT9L2ilMEY0YpTAHA==
+X-Talos-MUID: 9a23:zRfhBwXZw4pDlGbq/GXJmxM4auZt2v6VL0cAiMlWt9LUKgUlbg==
+X-IronPort-Anti-Spam-Filtered: true
+X-IronPort-AV: E=Sophos;i="6.14,237,1736809200"; 
+   d="ics'?scan'208,217,150";a="23131484"
+X-Amp-Result: UNKNOWN
+X-Amp-Original-Verdict: FILE UNKNOWN
+X-Marked-By: $ACCEPTED
+X-UzK-SPF-Result: pass
+X-MGA-submission: =?us-ascii?q?MDEbH2xL36dHSIUrp2bF9r4MX8yqzNp6STEdCg?=
+ =?us-ascii?q?o0ozuEQ0BO9phuyB+UJkX8NP+yUD8aks2mpfB7zIfESI66Jl2GzeY9za?=
+ =?us-ascii?q?uM3Tv6C5DhaETKAs8SpBTm8uStOm5qwGBe6vUaTzGi+QyA8gN3z+7sXi?=
+ =?us-ascii?q?n9?=
+Received: from mailout.rz.uni-frankfurt.de ([141.2.22.115])
+  by medi-v1.rrz.uni-koeln.de with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384; 10 Mar 2025 21:59:48 +0100
+DKIM-Signature: v=1; a=ed25519-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=med.uni-frankfurt.de; s=gu; h=Content-Transfer-Encoding:MIME-Version:
+	Content-Type:Date:Message-ID:From:To:Subject:Sender:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
+	List-Subscribe:List-Post:List-Owner:List-Archive;
+	bh=P/As3A+Xm+h4XXBYgz8v9Rody0TP6mNhXaWdSURxGfw=; b=VLpfjGe7pCD4ye8yL/Hm8YS9y3
+	MMoyiJCXfzfv4mfHUu+/JqhMnZMAStFKSqt9jIiIM+phK56PXClHoUm2yUAA==;
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+	d=med.uni-frankfurt.de; s=gu2; h=Content-Transfer-Encoding:MIME-Version:
+	Content-Type:Date:Message-ID:From:To:Subject:Sender:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
+	List-Subscribe:List-Post:List-Owner:List-Archive;
+	bh=P/As3A+Xm+h4XXBYgz8v9Rody0TP6mNhXaWdSURxGfw=; b=uo+NkULDB0waBfBWA9Ejm+Z25t
+	0E030s6YBj3gnK5cDVytv/Cm/Gxkshe7KhwESoxLKzQKq8FZ5vburS3iz7dAlJtBBToHcvqHB7P/4
+	ArLg2FvMebZBiGsWtmwsu3Q79qpgm6I1ybNEvwVapbV7EuG7K7E5dLsAIh6KEXGsxD6pEoRtyaZlw
+	5f0JMJ6NM69butfnatwL8SkiuDwNDuioZyMRAMvH+xMDyrH1TNYrPi7YpEjf5E4n+HSGHKNarwSoa
+	2O/1Q38fHwTOTKCK7yTuba7d8E8aAnN+MbgpVoZAMCnrUQvYg4UNQdcYqxO9eNB7PUQNot7WPL2hZ
+	47j9thfA==;
+Received: from horde5.cluster.uni-frankfurt.de ([10.1.1.237])
+	by mailout.rz.uni-frankfurt.de with esmtp (Exim 4.98.1)
+	(envelope-from <brechtel@med.uni-frankfurt.de>)
+	id 1trkDz-0000000G31W-1J49
+	for markus.brechtel@uk-koeln.de;
+	Mon, 10 Mar 2025 21:59:47 +0100
+Received: from [127.0.0.1] (helo=rz.uni-frankfurt.de)
+	by horde5.cluster.uni-frankfurt.de with esmtp (Exim 4.97.1)
+	(envelope-from <brechtel@med.uni-frankfurt.de>)
+	id 1trkDz-000000006uv-0nAk
+	for markus.brechtel@uk-koeln.de;
+	Mon, 10 Mar 2025 21:59:47 +0100
+Subject: Test 4
+To: markus.brechtel@uk-koeln.de
+From: Markus Katharina Brechtel <brechtel@med.uni-frankfurt.de>
+User-Agent: Kronolith H5 (4.2.29)
+Message-ID: <20250310215946.Horde.wtyCpB7NvUu4yWWGm-yd8ir@webmail.uni-frankfurt.de>
+Date: Mon, 10 Mar 2025 21:59:46 +0100
+Content-Type: multipart/mixed; boundary="=_ussSJMqbch0fokuO_m6VNEo"
+Content-Transfer-Encoding: 8bit
+X-Sophos-Firewall: smtpd v1.0
+Return-Path: prvs=1164869536=brechtel@med.uni-frankfurt.de
+X-MS-Exchange-Organization-Network-Message-Id: 68abe13f-6cc7-4e1c-f201-08dd6016828d
+X-MS-Exchange-Organization-AuthSource: W-EXCH-DB01.ADS.UK-KOELN.DE
+X-MS-Exchange-Organization-AuthAs: Anonymous
+X-MS-Exchange-Transport-EndToEndLatency: 00:00:00.6331394
+X-MS-Exchange-Processed-By-BccFoldering: 15.01.2507.039
+MIME-Version: 1.0
+
+--=_ussSJMqbch0fokuO_m6VNEo
+Content-Type: multipart/alternative; boundary="=_opDcWxcu73z8WaKuKhcD3XJ"
+Content-Transfer-Encoding: 8bit
+
+--=_opDcWxcu73z8WaKuKhcD3XJ
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+
+Test 4 (am 20.03.2025 um 01:00:00)
+
+
+Teilnehmer: markus.brechtel@uk-koeln.de, brechtel@med.uni-frankfurt.de
+
+Im Anhang befindet sich eine iCalendar-Datei mit mehr Informationen zu diesem Termin. Wenn Ihr E-Mail-Programm iTip-Anfragen beherrscht, kÃ¶nnen Sie diese Datei dazu benutzen, Ihre lokale Version des Termins zu aktualisieren.
+
+Falls Ihr E-Mail-Programm keine iTip-Anfragen unterstÃ¼tzt, kÃ¶nnen Sie einen der folgenden Links verwenden, um den Termin zu bestÃ¤tigen oder abzulehnen.
+
+Um den Termin zu bestÃ¤tigen:
+https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&e=x6wWFHsocTVboCMqAB36QcQ&u=markus.brechtel%40uk-koeln.de&a=accept
+
+Um den Termin unter Vorbehalt zu bestÃ¤tigen:
+https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&e=x6wWFHsocTVboCMqAB36QcQ&u=markus.brechtel%40uk-koeln.de&a=tentative
+
+Um den Termin abzulehnen:
+https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&e=x6wWFHsocTVboCMqAB36QcQ&u=markus.brechtel%40uk-koeln.de&a=decline
+
+--=_opDcWxcu73z8WaKuKhcD3XJ
+Content-Type: multipart/related; boundary="=_6q7Z3dTe3D-aYZW2NRJdpNH";
+ start="Th6sJiZ-Tz5LqONh9sh11OV@horde5.cluster.uni-frankfurt.de"
+Content-Transfer-Encoding: 8bit
+
+--=_6q7Z3dTe3D-aYZW2NRJdpNH
+Content-Type: text/html; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+Content-ID: <Th6sJiZ-Tz5LqONh9sh11OV@horde5.cluster.uni-frankfurt.de>
+
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"><p><font size="4"><strong>Markus Katharina Brechtel mÃ¶chte Sie auf &quot;Test 4&quot; aufmerksam machen.</strong></font></p>
+<table width="100%" border="0" cellspacing="0" cellpadding="0"><tr>
+  <td width="140" valign="top">
+    <img src="cid:Cy-SAfD3F-wAQdqEZmPykC5@horde5.cluster.uni-frankfurt.de">
+  </td>
+  <td valign="top">
+    <table width="100%" border="0" cellpadding="5" cellspacing="0">
+      <thead><tr>
+        <th colspan="3" align="left"><font size="3"><strong>Test 4</strong></font></th>
+      </tr></thead>
+      <tbody>
+        
+        <tr bgcolor="#f1f1f1">
+          <td nowrap="nowrap" align="right">
+            <font size="2"><strong>Beginn:</strong></font>
+          </td>
+          <td width="5">&nbsp;</td>
+          <td width="100%"><font size="2"><strong>20.03.2025 01:00:00</strong></font></td>
+        </tr>
+        <tr>
+          <td nowrap="nowrap" align="right">
+            <font size="2"><strong>Ende:</strong></font>
+          </td>
+          <td width="5">&nbsp;</td>
+          <td width="100%"><font size="2"><strong>20.03.2025 02:00:00</strong></font></td>
+        </tr>
+                
+        <tr bgcolor="#f1f1f1">
+          <td nowrap="nowrap" align="right" valign="top">
+            <font size="2"><strong>Teilnehmer:</strong></font>
+          </td>
+          <td width="5">&nbsp;</td>
+          <td width="100%"><font size="2"><strong>
+                                    markus.brechtel@uk-koeln.de<br>
+                                                 brechtel@med.uni-frankfurt.de<br>
+                        
+          </strong></font></td>
+        </tr>
+        
+        
+      </tbody>
+    </table>
+  </td>
+</tr></table>
+
+<p><font size="2">Im Anhang befindet sich eine iCalendar-Datei mit mehr Informationen zu diesem Termin. Wenn Ihr E-Mail-Programm iTip-Anfragen beherrscht, kÃ¶nnen Sie diese Datei dazu benutzen, Ihre lokale Version des Termins zu aktualisieren.</font></p>
+
+<p><font size="2">Falls Ihr E-Mail-Programm keine iTip-Anfragen unterstÃ¼tzt, kÃ¶nnen Sie die folgenden Links verwenden, um den Termin: <strong><a href="https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&amp;e=x6wWFHsocTVboCMqAB36QcQ&amp;u=markus.brechtel%40uk-koeln.de&amp;a=accept">zu bestÃ¤tigen</a></strong>, <strong><a href="https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&amp;e=x6wWFHsocTVboCMqAB36QcQ&amp;u=markus.brechtel%40uk-koeln.de&amp;a=tentative">unter Vorbehalt zu bestÃ¤tigen</a></strong> oder <strong><a href="https://webmail.uni-frankfurt.de/kronolith/attend.php?c=kvq1eczjibB7-BL7ap5O3q2&amp;e=x6wWFHsocTVboCMqAB36QcQ&amp;u=markus.brechtel%40uk-koeln.de&amp;a=decline">abzulehnen</a></strong>.</font></p>
+
+--=_6q7Z3dTe3D-aYZW2NRJdpNH
+Content-Type: image/png
+Content-Disposition: attachment
+Content-Transfer-Encoding: base64
+Content-ID: <Cy-SAfD3F-wAQdqEZmPykC5@horde5.cluster.uni-frankfurt.de>
+
+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
+JRr9BtId2UJuUp+KAAAAAElFTkSuQmCC
+
+--=_6q7Z3dTe3D-aYZW2NRJdpNH--
+
+--=_opDcWxcu73z8WaKuKhcD3XJ
+Content-Type: text/calendar; charset=utf-8; name=event-invitation.ics;
+ METHOD=REQUEST
+Content-Disposition: attachment; filename="event-invitation.ics"
+
+BEGIN:VCALENDAR
+VERSION:2.0
+METHOD:REQUEST
+X-WR-CALNAME:Arbeitskalender von MK Brechtel
+PRODID:-//The Horde Project//Horde iCalendar Library//EN
+BEGIN:VEVENT
+DTSTART:20250320T000000Z
+DTEND:20250320T010000Z
+DTSTAMP:20250310T205946Z
+UID:20250310215946.axX7omDXW0OizUH9oNwYJiw@webmail.uni-frankfurt.de
+CREATED:20250310T205946Z
+LAST-MODIFIED:20250310T205946Z
+SUMMARY:Test 4
+ORGANIZER;CN=Markus Katharina Brechtel:mailto:brechtel@med.uni-frankfurt.de
+CLASS:PUBLIC
+STATUS:CONFIRMED
+TRANSP:OPAQUE
+ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:markus
+ .brechtel@uk-koeln.de
+ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:brecht
+ el@med.uni-frankfurt.de
+END:VEVENT
+END:VCALENDAR
+
+--=_opDcWxcu73z8WaKuKhcD3XJ--
+
+--=_ussSJMqbch0fokuO_m6VNEo
+Content-Type: application/ics; name=event-invitation.ics; METHOD=REQUEST
+Content-Disposition: attachment; filename="event-invitation.ics"
+Content-Transfer-Encoding: base64
+
+QkVHSU46VkNBTEVOREFSDQpWRVJTSU9OOjIuMA0KTUVUSE9EOlJFUVVFU1QNClgtV1ItQ0FMTkFN
+RTpBcmJlaXRza2FsZW5kZXIgdm9uIE1LIEJyZWNodGVsDQpQUk9ESUQ6LS8vVGhlIEhvcmRlIFBy
+b2plY3QvL0hvcmRlIGlDYWxlbmRhciBMaWJyYXJ5Ly9FTg0KQkVHSU46VkVWRU5UDQpEVFNUQVJU
+OjIwMjUwMzIwVDAwMDAwMFoNCkRURU5EOjIwMjUwMzIwVDAxMDAwMFoNCkRUU1RBTVA6MjAyNTAz
+MTBUMjA1OTQ2Wg0KVUlEOjIwMjUwMzEwMjE1OTQ2LmF4WDdvbURYVzBPaXpVSDlvTndZSml3QHdl
+Ym1haWwudW5pLWZyYW5rZnVydC5kZQ0KQ1JFQVRFRDoyMDI1MDMxMFQyMDU5NDZaDQpMQVNULU1P
+RElGSUVEOjIwMjUwMzEwVDIwNTk0NloNClNVTU1BUlk6VGVzdCA0DQpPUkdBTklaRVI7Q049TWFy
+a3VzIEthdGhhcmluYSBCcmVjaHRlbDptYWlsdG86YnJlY2h0ZWxAbWVkLnVuaS1mcmFua2Z1cnQu
+ZGUNCkNMQVNTOlBVQkxJQw0KU1RBVFVTOkNPTkZJUk1FRA0KVFJBTlNQOk9QQVFVRQ0KQVRURU5E
+RUU7Uk9MRT1SRVEtUEFSVElDSVBBTlQ7UEFSVFNUQVQ9TkVFRFMtQUNUSU9OO1JTVlA9VFJVRTpt
+YWlsdG86bWFya3VzDQogLmJyZWNodGVsQHVrLWtvZWxuLmRlDQpBVFRFTkRFRTtST0xFPVJFUS1Q
+QVJUSUNJUEFOVDtQQVJUU1RBVD1ORUVEUy1BQ1RJT047UlNWUD1UUlVFOm1haWx0bzpicmVjaHQN
+CiBlbEBtZWQudW5pLWZyYW5rZnVydC5kZQ0KRU5EOlZFVkVOVA0KRU5EOlZDQUxFTkRBUg0K
+
+--=_ussSJMqbch0fokuO_m6VNEo--

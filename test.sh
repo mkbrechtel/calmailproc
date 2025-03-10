@@ -11,16 +11,16 @@ vdir_args="-store -vdir test/vdir"
 rm -rf test/vdir
 
 # Process the files in specific order to test recurring event handling in vdir
-for file in test/mails/example-mail-owa-[1-4].eml; do
+for file in test/mails/example-mail-0[1-4].eml; do
     echo "Processing $file (vdir)"
     $calmailproc $vdir_args < "$file"
 done
 
 # Process recurring events in order for vdir
 echo "Processing recurring event series (vdir)..."
-$calmailproc $vdir_args < test/mails/example-mail-owa-5.eml
-$calmailproc $vdir_args < test/mails/example-mail-owa-7.eml
-$calmailproc $vdir_args < test/mails/example-mail-owa-6.eml
+$calmailproc $vdir_args < test/mails/example-mail-05.eml
+$calmailproc $vdir_args < test/mails/example-mail-07.eml
+$calmailproc $vdir_args < test/mails/example-mail-06.eml
 
 # Verify the vdir storage
 uid="040000008200E00074C5B7101A82E0080000000044440AFCBB91DB0100000000000000001000000087598F58784D4541BAA76F1829CFE9A1"
@@ -54,16 +54,16 @@ icalfile_args="-store -icalfile test/calendar.ics"
 rm -f test/calendar.ics
 
 # Process the files in specific order to test recurring event handling in icalfile
-for file in test/mails/example-mail-owa-[1-4].eml; do
+for file in test/mails/example-mail-0[1-4].eml; do
     echo "Processing $file (icalfile)"
     $calmailproc $icalfile_args < "$file"
 done
 
 # Process recurring events in order for icalfile
 echo "Processing recurring event series (icalfile)..."
-$calmailproc $icalfile_args < test/mails/example-mail-owa-5.eml
-$calmailproc $icalfile_args < test/mails/example-mail-owa-7.eml
-$calmailproc $icalfile_args < test/mails/example-mail-owa-6.eml
+$calmailproc $icalfile_args < test/mails/example-mail-05.eml
+$calmailproc $icalfile_args < test/mails/example-mail-07.eml
+$calmailproc $icalfile_args < test/mails/example-mail-06.eml
 
 # Verify the icalfile storage
 if [ -f "test/calendar.ics" ]; then
