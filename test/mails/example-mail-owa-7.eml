@@ -1,0 +1,163 @@
+Return-Path: <markus.brechtel@uk-koeln.de>
+Delivered-To: brechtel
+Received: from dovecot-director-3.cluster.uni-frankfurt.de ([10.1.1.92])
+	by blade5e.rz.uni-frankfurt.de with LMTP
+	id KIM1M+bizmdXRx0AQ33LqA
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	for <brechtel>; Mon, 10 Mar 2025 14:02:30 +0100
+Received: from dovecot-director-3.cluster.uni-frankfurt.de
+	by dovecot-director-3.cluster.uni-frankfurt.de with LMTP
+	id aK8eM+bizmdl9BgAIw8KAw
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	for <brechtel@med.uni-frankfurt.de>; Mon, 10 Mar 2025 14:02:30 +0100
+Received: from lb-mail-36-226.rz.uni-frankfurt.de ([141.2.36.226] helo=mx-1.cluster.uni-frankfurt.de)
+	by dovecot-director-3.cluster.uni-frankfurt.de with esmtps  (TLS1.3) tls TLS_AES_256_GCM_SHA384
+	(Exim 4.98.1)
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	id 1trcm6-000000071FM-3Jp8
+	for brechtel@med.uni-frankfurt.de;
+	Mon, 10 Mar 2025 14:02:30 +0100
+Received: from mail-out-v1.uni-koeln.de ([134.95.86.58])
+	by mx-1.cluster.uni-frankfurt.de with esmtps  (TLS1.2) tls TLS_DHE_RSA_WITH_AES_256_GCM_SHA384
+	(Exim 4.98)
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	id 1trckc-0000000DQuX-0RGB
+	for brechtel@med.uni-frankfurt.de;
+	Mon, 10 Mar 2025 14:00:58 +0100
+X-CSE-ConnectionGUID: WvC5Vo/CSsWIgHR6F4ITfQ==
+X-CSE-MsgGUID: zSdf+EpUT8GYtua9BwWrXw==
+X-IPAS-Result: =?us-ascii?q?A+BSJwCx4c5n/wCiACoSAIIYWhoBAQEBATwBAQEBAgIBA?=
+ =?us-ascii?q?QEBAgEBAQEDAQEBAYFqMASBCxsCAQEBAQGDX4Q4WZRvjj+FK4hAEw8BDAMBA?=
+ =?us-ascii?q?RQwBAEBhR8Gin0oSwECBAEBAQEDAgMBAQEBAQEBAQEBAQsBAQYBAQEBAQEGB?=
+ =?us-ascii?q?YEhhTVThwRoAQsBAjwCBC8mAQQbhRcNO68wAoEygQGEM0nZOIFeEIFGAwEBA?=
+ =?us-ascii?q?QEBAYVlgmMBKoEygx9vAYUtgVVEa4NUgU2CaIQngmkEh1apGiyBG0szLAEPE?=
+ =?us-ascii?q?TUTFwsHBYFsAyo0MYFGQzc3ggxpSToCDQI1ghskWIIrhE2EPIRBhVCCEYIFi?=
+ =?us-ascii?q?S2EZC4yHUADCwdmPTcUGwYCAYE1nHeBDoETgQIKEKBni1GBe6E+NAeCOIFmg?=
+ =?us-ascii?q?V0GDJ9hLheXRg6TA5h+IqhnAgQCBAUCFgGDfE0kgzdRFwIP2HmBTQmQSAGBH?=
+ =?us-ascii?q?AEB?=
+IronPort-Data: A9a23:ItA9Qag9lpfZaKr7ldQG3mczX161AxEKZh0ujC45NGQN5FlHY01je
+ htvDGmFMquNZTTyft52aNix805SscKDnNZnTQBrqCpjF39jpJueD7x1DKtS0wC6dZSfER09v
+ 63yTvGacajYm1eF/k/F3oDJ9Cc6jefQAOKhVIYoAwgpLSd8UiAtlBl/rOAwh49skLCRDhiE0
+ T/Ii5S31GSNhXgtbgr414rZ8Eky5K+r4GtB1rADTakjUGH2xyF94K03fcldH1OgKqFIE+izQ
+ fr0zb3R1gvx4xc3B9q5pa3we0sMT6S6FVDmZq1+AvXKbrBq/0Te445jXBYuQR4/Zwahw7id/
+ O5wWamYEm/FCEFtdNM1CHG0GwkmVUFPFSSuzXKX6aR/xGWeG5fgLmkH4EweZeUlFuhL7W5my
+ uIzdQ4KKTu4nN2Xz5KBFMcwp/gtFZy+VG8fkikIITDxFvM6WdXEXrmP/98Hmi0qlIZTG/ebZ
+ M0UbTwpYBmojx9nYF5PUMA3xr/w1CGtKmcK+gvM9cLb4ECKpOB1+L3kKtnIYZqAX8henlqVo
+ krb/CH6BRweMpqTxFJp91r827eUx3ugMG4UPK+D+vAprUWu+jw8OQELXAqRvsajulHrDrqzL
+ GRRoELCt5Ma/lamRdnhUhmQpXOI+AMaWp9eCeQ86w+Q0LaS7wvxO4QfZiVEdMRjs9IqACYqi
+ RmThcGvGDpu9b6SRHabsLuZxd+vBRUowaY5TXdsZWM4DxPL+enfUjqnog5fLZOI
+IronPort-HdrOrdr: A9a23:cNSdSqtQ0HAS2VVkWin5msKT7skDRtV00zEX/kB9WHVpm6uj+/
+ xG/c516faQsl0ssR4b9+xoR5PwJE80maQV3WByB8bAYOCWgguVxehZhOOJrgEIcBeOlNK1u5
+ 0QFZRWOZndCkV7kNa/wCTQKadY/DBfytHNuQ4J9QYLcT1X
+X-Talos-CUID: 9a23:MC4qwWyUmaHtFGy8np92BgUrBOt4THqa50zLHG63KVw3ZuG0dVGprfY=
+X-Talos-MUID: 9a23:8hKdhQYdnRBPseBTpQTginJPLPpUs4ufFF0EwL8ZhNO0Knkl
+X-IronPort-Anti-Spam-Filtered: true
+X-IronPort-AV: E=Sophos;i="6.14,236,1736809200"; 
+   d="scan'208,217";a="8503203"
+Received: from smtp-out-rh7.rrz.uni-koeln.de ([IPv6:2a00:a200:0:12::118])
+  by mail-out-v1.uni-koeln.de with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384; 10 Mar 2025 14:00:57 +0100
+Received: from smtp.uni-koeln.de (msa-node1-rh7.rrz.uni-koeln.de [IPv6:2a00:a200:0:15::202])
+	by smtp-out.rrz.uni-koeln.de (8.14.7/8.14.7) with ESMTP id 52AD0uNC062820
+	for <brechtel@med.uni-frankfurt.de>; Mon, 10 Mar 2025 14:00:57 +0100
+Received: from mail-gw.uk-koeln.de (mail-gw.uk-koeln.de [134.95.33.33])
+	by smtp.uni-koeln.de (8.14.7/8.14.7) with ESMTP id 52AD0u3U099099
+	(version=TLSv1/SSLv3 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NOT)
+	for <brechtel@med.uni-frankfurt.de>; Mon, 10 Mar 2025 14:00:56 +0100
+Received: from w-exch-db04.ads.uk-koeln.de ([134.95.197.236]:17860 helo=owa.uk-koeln.de)
+	by mail-gw.uk-koeln.de with esmtps  (TLS1.2) tls TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+	(Exim 4.96)
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	id 1trckJ-000000006OA-2gBq
+	for brechtel@med.uni-frankfurt.de;
+	Mon, 10 Mar 2025 14:00:39 +0100
+Received: from W-EXCH-DB02.ADS.UK-KOELN.DE (134.95.197.234) by
+ W-EXCH-DB04.ADS.UK-KOELN.DE (134.95.197.236) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id
+ 15.1.2507.39; Mon, 10 Mar 2025 14:00:39 +0100
+Received: from W-EXCH-DB02.ADS.UK-KOELN.DE ([fe80::a102:8171:65d2:3894]) by
+ W-EXCH-DB02.ADS.UK-KOELN.DE ([fe80::a102:8171:65d2:3894%3]) with mapi id
+ 15.01.2507.039; Mon, 10 Mar 2025 14:00:39 +0100
+From: Markus Brechtel <markus.brechtel@uk-koeln.de>
+To: "'brechtel@med.uni-frankfurt.de'" <brechtel@med.uni-frankfurt.de>
+Subject: Test 3
+Thread-Topic: Test 3
+Thread-Index: AduRu/wMfPvhBqfz5U2STxrdNsBSJQ==
+Date: Mon, 10 Mar 2025 13:00:39 +0000
+Message-ID: <182bd625c9f94d3a9397fb04e930b2e9@uk-koeln.de>
+Accept-Language: de-DE, en-US
+Content-Language: de-DE
+X-MS-Has-Attach:
+X-MS-TNEF-Correlator:
+x-ms-exchange-calendar-series-instance-id: BAAAAIIA4AB0xbcQGoLgCAfpAxRERAr8u5HbAQAAAAAAAAAAEAAAAIdZj1h4TUVBuqdvGCnP6aE=
+x-originating-ip: [134.95.33.58]
+Content-Type: multipart/alternative;
+	boundary="_000_182bd625c9f94d3a9397fb04e930b2e9ukkoelnde_"
+MIME-Version: 1.0
+X-Scanned-By: MIMEDefang 3.3
+X-MailScanner-Information: Please contact the ISP for more information
+X-MailScanner-ID: 1trckc-0000000DQuX-0RGB
+X-MailScanner: Found to be clean
+X-MailScanner-SpamCheck: not spam, SpamAssassin (nicht zwischen gespeichert,
+	Wertung=-1.778, benoetigt 4, BAYES_00 -1.90, DMARC_MISSING 0.00,
+	EMPTY_MESSAGE 2.32, HTML_MESSAGE 0.00, MIME_HTML_MOSTLY 0.10,
+	RCVD_IN_DNSWL_MED -2.30, SPF_HELO_NONE 0.00, SPF_PASS -0.00)
+X-MailScanner-From: markus.brechtel@uk-koeln.de
+
+--_000_182bd625c9f94d3a9397fb04e930b2e9ukkoelnde_
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+
+
+
+--_000_182bd625c9f94d3a9397fb04e930b2e9ukkoelnde_
+Content-Type: text/html; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=
+1">
+<style type=3D"text/css" style=3D"display:none;"><!-- P {margin-top:0;margi=
+n-bottom:0;} --></style>
+</head>
+<body dir=3D"ltr">
+<div id=3D"divtagdefaultwrapper" style=3D"font-size:12pt;color:#000000;font=
+-family:Calibri,Helvetica,sans-serif;" dir=3D"ltr">
+<p><br>
+</p>
+</div>
+</body>
+</html>
+
+--_000_182bd625c9f94d3a9397fb04e930b2e9ukkoelnde_
+Content-Type: text/calendar; charset="utf-8"; method=REQUEST
+Content-Transfer-Encoding: base64
+
+QkVHSU46VkNBTEVOREFSDQpNRVRIT0Q6UkVRVUVTVA0KUFJPRElEOk1pY3Jvc29mdCBFeGNoYW5n
+ZSBTZXJ2ZXIgMjAxMA0KVkVSU0lPTjoyLjANCkJFR0lOOlZUSU1FWk9ORQ0KVFpJRDpXLiBFdXJv
+cGUgU3RhbmRhcmQgVGltZQ0KQkVHSU46U1RBTkRBUkQNCkRUU1RBUlQ6MTYwMTAxMDFUMDMwMDAw
+DQpUWk9GRlNFVEZST006KzAyMDANClRaT0ZGU0VUVE86KzAxMDANClJSVUxFOkZSRVE9WUVBUkxZ
+O0lOVEVSVkFMPTE7QllEQVk9LTFTVTtCWU1PTlRIPTEwDQpFTkQ6U1RBTkRBUkQNCkJFR0lOOkRB
+WUxJR0hUDQpEVFNUQVJUOjE2MDEwMTAxVDAyMDAwMA0KVFpPRkZTRVRGUk9NOiswMTAwDQpUWk9G
+RlNFVFRPOiswMjAwDQpSUlVMRTpGUkVRPVlFQVJMWTtJTlRFUlZBTD0xO0JZREFZPS0xU1U7QllN
+T05USD0zDQpFTkQ6REFZTElHSFQNCkVORDpWVElNRVpPTkUNCkJFR0lOOlZFVkVOVA0KT1JHQU5J
+WkVSO0NOPU1hcmt1cyBCcmVjaHRlbDpNQUlMVE86bWFya3VzLmJyZWNodGVsQHVrLWtvZWxuLmRl
+DQpBVFRFTkRFRTtST0xFPVJFUS1QQVJUSUNJUEFOVDtQQVJUU1RBVD1ORUVEUy1BQ1RJT047UlNW
+UD1UUlVFO0NOPSdicmVjaHRlbEANCiBtZWQudW5pLWZyYW5rZnVydC5kZSc6TUFJTFRPOmJyZWNo
+dGVsQG1lZC51bmktZnJhbmtmdXJ0LmRlDQpERVNDUklQVElPTjtMQU5HVUFHRT1kZS1ERTpcbg0K
+VUlEOjA0MDAwMDAwODIwMEUwMDA3NEM1QjcxMDFBODJFMDA4MDAwMDAwMDA0NDQ0MEFGQ0JCOTFE
+QjAxMDAwMDAwMDAwMDAwMDAwDQogMDEwMDAwMDAwODc1OThGNTg3ODRENDU0MUJBQTc2RjE4MjlD
+RkU5QTENClJFQ1VSUkVOQ0UtSUQ7VFpJRD1XLiBFdXJvcGUgU3RhbmRhcmQgVGltZToyMDI1MDMy
+MFQxNTAwMDANClNVTU1BUlk7TEFOR1VBR0U9ZGUtREU6VGVzdCAzDQpEVFNUQVJUO1RaSUQ9Vy4g
+RXVyb3BlIFN0YW5kYXJkIFRpbWU6MjAyNTAzMjBUMTEwMDAwDQpEVEVORDtUWklEPVcuIEV1cm9w
+ZSBTdGFuZGFyZCBUaW1lOjIwMjUwMzIwVDEyMDAwMA0KQ0xBU1M6UFVCTElDDQpQUklPUklUWTo1
+DQpEVFNUQU1QOjIwMjUwMzEwVDEzMDAzOVoNClRSQU5TUDpPUEFRVUUNClNUQVRVUzpDT05GSVJN
+RUQNClNFUVVFTkNFOjENCkxPQ0FUSU9OO0xBTkdVQUdFPWRlLURFOg0KWC1NSUNST1NPRlQtQ0RP
+LUFQUFQtU0VRVUVOQ0U6MQ0KWC1NSUNST1NPRlQtQ0RPLU9XTkVSQVBQVElEOjIxMjM1ODM4MTIN
+ClgtTUlDUk9TT0ZULUNETy1CVVNZU1RBVFVTOlRFTlRBVElWRQ0KWC1NSUNST1NPRlQtQ0RPLUlO
+VEVOREVEU1RBVFVTOkJVU1kNClgtTUlDUk9TT0ZULUNETy1BTExEQVlFVkVOVDpGQUxTRQ0KWC1N
+SUNST1NPRlQtQ0RPLUlNUE9SVEFOQ0U6MQ0KWC1NSUNST1NPRlQtQ0RPLUlOU1RUWVBFOjMNClgt
+TUlDUk9TT0ZULURPTk9URk9SV0FSRE1FRVRJTkc6RkFMU0UNClgtTUlDUk9TT0ZULURJU0FMTE9X
+LUNPVU5URVI6RkFMU0UNCkVORDpWRVZFTlQNCkVORDpWQ0FMRU5EQVINCg==
+
+--_000_182bd625c9f94d3a9397fb04e930b2e9ukkoelnde_--

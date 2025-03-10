@@ -8,7 +8,7 @@ import (
 
 func TestParseEmail(t *testing.T) {
 	// Open the test email file
-	file, err := os.Open("../test/mails/example-mail-1.eml")
+	file, err := os.Open("../test/mails/example-mail-owa-1.eml")
 	if err != nil {
 		t.Fatalf("Failed to open test email: %v", err)
 	}
