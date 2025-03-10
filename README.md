@@ -1,17 +1,31 @@
-# calmailproc
-
 [![Build Status](https://github.com/mkbrechtel/calmailproc/actions/workflows/test-build.yml/badge.svg)](https://github.com/mkbrechtel/calmailproc/actions/workflows/test-build.yml)
 
-A calendar mail processor that extracts calendar event information from email files (.eml) containing iCalendar (.ics) data.
+# calmailproc
+
+A calendar mail processor that extracts calendar event information from emails containing iCalendar invitation events and stores them in various calendar storage formats.
 
 ## Features
 
-- Reads email messages from stdin
-- Parses email headers and extracts relevant information
-- Identifies and extracts calendar event data from the email
-- Outputs processed data in plain text or JSON format
-- Designed to work in Unix mail processing pipelines
+- **Input Options**:
+  - Process email from stdin (default)
+  - Process email files from maildir folders (with recursive subfolder support)
+  
+- **Storage Options**:
+  - Store calendar events in vdir format (compatible with vdirsyncer)
+  - Store calendar events in a single iCalendar file
+  - Default storage uses ~/.calendar directory
 
+- **Processing Features**:
+  - Parse iCalendar invitation data from email attachments
+  - Handle invitation updates (METHOD:REQUEST)
+  - Process attendance replies (METHOD:REPLY) to update event status
+  - Support for recurring events and updates to specific occurrences
+  
+- **Output Options**:
+  - Plain text output showing event details
+  - JSON output for integration with other tools
+  - Configurable verbosity levels for debugging
+  
 ## Installation
 
 ### From Source
@@ -33,12 +47,53 @@ go install github.com/mkbrechtel/calmailproc@latest
 
 ## Usage
 
+### Process a single email
+
 ```bash
 # Process an email file and display information in plain text
 cat email.eml | calmailproc
 
-# Process an email file and output JSON format
+# Process and store the calendar event
+cat email.eml | calmailproc -store
+
+# Process and output in JSON format
 cat email.eml | calmailproc -json
+
+# Specify storage location (vdir format)
+cat email.eml | calmailproc -store -vdir ~/.calendar/events
+```
+
+### Process a maildir
+
+```bash
+# Process all emails in a maildir (recursively)
+calmailproc -maildir ~/Mail/MyFolder -store
+
+# With verbose output
+calmailproc -maildir ~/Mail/MyFolder -store -verbose
+
+# Using a specific storage location
+calmailproc -maildir ~/Mail/MyFolder -store -vdir ~/.calendar/invitations
+```
+
+### Command Line Options
+
+```
+Usage of calmailproc:
+  -icalfile string
+        Path to single iCalendar file storage
+  -json
+        Output in JSON format
+  -maildir string
+        Path to maildir to process (will process all emails recursively)
+  -process-replies
+        Process attendance replies to update events (default true)
+  -store
+        Store calendar event if found
+  -vdir string
+        Path to vdir storage directory
+  -verbose
+        Enable verbose logging output
 ```
 
 ### Integration with mail systems
@@ -49,43 +104,57 @@ The tool is designed to be used in standard Unix mail pipelines. For example:
 # Process incoming mail with procmail
 :0c
 * ^Content-Type:.*text/calendar
-| calmailproc > /path/to/calendar/event.txt
+| calmailproc -store -vdir ~/.calendar/invitations > /path/to/logs/calendar.log
 ```
 
 ### Example output
 
 Plain text:
 ```
-Subject: Test Event 1
-From: Markus Brechtel <markus.brechtel@uk-koeln.de>
-To: "user@example.com" <user@example.com>
+Subject: Team Meeting
+From: Alice <alice@example.com>
+To: Team <team@example.com>
 Date: 2025-03-10 09:41:35
 
 Calendar Event:
-  Summary: Test Event 1
+  UID: team-meeting-2025-03-10@example.com
+  Summary: Team Meeting
   Start: 2025-03-10 14:00:00
   End: 2025-03-10 15:00:00
   Location: Meeting Room A
-  Organizer: Markus Brechtel
+  Organizer: Alice
+  Method: REQUEST
 ```
 
 JSON:
 ```json
 {
-  "subject": "Test Event 1",
-  "from": "Markus Brechtel <markus.brechtel@uk-koeln.de>",
-  "to": "\"user@example.com\" <user@example.com>",
+  "subject": "Team Meeting",
+  "from": "Alice <alice@example.com>",
+  "to": "Team <team@example.com>",
   "date": "2025-03-10T09:41:35Z",
   "has_calendar": true,
   "event": {
-    "summary": "Test Event 1",
+    "uid": "team-meeting-2025-03-10@example.com",
+    "summary": "Team Meeting",
     "start": "2025-03-10T14:00:00+01:00",
     "end": "2025-03-10T15:00:00+01:00",
     "location": "Meeting Room A",
-    "organizer": "Markus Brechtel"
+    "organizer": "Alice",
+    "method": "REQUEST"
   }
 }
 ```
+
+## Storage Formats
+
+### vdir
+
+The vdir format stores each calendar event as a separate file in a directory structure, making it compatible with vdirsyncer and other calendar tools. Each event is stored in a file named with the event's UID and a .ics extension.
+
+### iCalendar File
+
+A single iCalendar file can contain multiple events and is compatible with most calendar applications. This format is useful for simple import/export scenarios.
 
 ## Development
 
@@ -95,10 +164,11 @@ JSON:
 go test ./...
 ```
 
-### Formatting Code
+### Formatting and Linting
 
 ```bash
 go fmt ./...
+golangci-lint run
 ```
 
 ## GitHub Workflows
@@ -110,11 +180,11 @@ This project uses GitHub Actions for continuous integration:
 
 ## Future Improvements
 
-- Improved iCalendar parsing with proper timezone handling
-- Support for recurring events
-- Support for meeting acceptances/declines
-- Additional output formats (e.g., vCard)
+- Enhanced timezone handling for better cross-timezone event management
+- Better support for complex recurring event patterns
+- MIME format improvements for better compatibility with various email clients
 - Calendar event filtering options
+- Notifications and reminders integration
 
 ## License
 
