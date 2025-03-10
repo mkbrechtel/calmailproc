@@ -170,28 +170,28 @@ func (s *ICalFileStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 		// We found the event, extract its data
 		var eventBuf bytes.Buffer
 		eventCal := ical.NewCalendar()
-		
+
 		// Copy the relevant properties from the main calendar
 		eventCal.Props = cal.Props
-		
+
 		// Add the event component
 		eventCal.Children = append(eventCal.Children, component)
-		
+
 		// Also add any related components (like recurring event exceptions)
 		for _, otherComponent := range cal.Children {
 			if otherComponent.Name != "VEVENT" {
 				continue
 			}
-			
+
 			otherUID := otherComponent.Props.Get("UID")
 			if otherUID == nil || otherUID.Value != id || otherComponent == component {
 				continue
 			}
-			
+
 			// This is another component with the same UID (likely a recurring event exception)
 			eventCal.Children = append(eventCal.Children, otherComponent)
 		}
-		
+
 		// Encode the event calendar
 		encoder := ical.NewEncoder(&eventBuf)
 		if err := encoder.Encode(eventCal); err != nil {

@@ -48,7 +48,7 @@ func TestParseEmail(t *testing.T) {
 			t.Error("Expected non-empty event UID")
 		}
 		t.Logf("Event UID: %s", email.Event.UID)
-		
+
 		if email.Event.Summary == "" {
 			t.Logf("Warning: Empty event summary")
 		} else {

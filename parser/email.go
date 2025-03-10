@@ -140,7 +140,7 @@ func extractBasicCalendarInfo(icsData []byte) (*CalendarEvent, error) {
 	event := &CalendarEvent{
 		RawData: icsData,
 	}
-	
+
 	// Extract METHOD if present at calendar level
 	methodProp := cal.Props.Get("METHOD")
 	if methodProp != nil {

@@ -51,7 +51,7 @@ func (s *VDirStorage) StoreEvent(event *parser.CalendarEvent) error {
 		}
 		return nil
 	}
-	
+
 	// Extract the METHOD if present
 	methodValue := ""
 	methodProp := cal.Props.Get("METHOD")
@@ -113,20 +113,20 @@ func (s *VDirStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, new
 	if recurrenceID == nil {
 		return fmt.Errorf("missing RECURRENCE-ID in event update")
 	}
-	
+
 	// Find if this specific occurrence already exists in the calendar
 	foundExisting := false
 	for i, component := range existingCal.Children {
 		if component.Name != "VEVENT" {
 			continue
 		}
-		
+
 		// Check if this is the same occurrence by matching RECURRENCE-ID
 		existingRecurrenceID := component.Props.Get("RECURRENCE-ID")
 		if existingRecurrenceID != nil && existingRecurrenceID.Value == recurrenceID.Value {
 			// Found the existing occurrence to update
 			foundExisting = true
-			
+
 			// Handle cancellations (METHOD:CANCEL)
 			if methodValue == "CANCEL" {
 				// For cancellations, we update the status to CANCELLED
@@ -138,7 +138,7 @@ func (s *VDirStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, new
 			break
 		}
 	}
-	
+
 	// If we didn't find an existing occurrence with this RECURRENCE-ID, add it
 	if !foundExisting {
 		if methodValue == "CANCEL" {
@@ -150,18 +150,18 @@ func (s *VDirStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, new
 			existingCal.Children = append(existingCal.Children, newEvent)
 		}
 	}
-	
+
 	// Write the updated calendar back to the file
 	var buf bytes.Buffer
 	encoder := ical.NewEncoder(&buf)
 	if err := encoder.Encode(existingCal); err != nil {
 		return fmt.Errorf("encoding updated calendar: %w", err)
 	}
-	
+
 	if err := os.WriteFile(filePath, buf.Bytes(), 0644); err != nil {
 		return fmt.Errorf("writing updated calendar file: %w", err)
 	}
-	
+
 	return nil
 }
 

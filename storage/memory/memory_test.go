@@ -152,7 +152,7 @@ END:VCALENDAR`)
 		recurrenceID := component.Props.Get("RECURRENCE-ID")
 		if recurrenceID != nil && recurrenceID.Value == "20250308T090000Z" {
 			foundException = true
-			
+
 			// Verify the Summary was updated
 			summary := component.Props.Get("SUMMARY")
 			if summary == nil || summary.Value != "Updated Recurring Meeting" {

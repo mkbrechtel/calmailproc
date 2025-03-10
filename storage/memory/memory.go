@@ -110,20 +110,20 @@ func (s *MemoryStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, n
 	if recurrenceID == nil {
 		return fmt.Errorf("missing RECURRENCE-ID in event update")
 	}
-	
+
 	// Find if this specific occurrence already exists in the calendar
 	foundExisting := false
 	for i, component := range existingCal.Children {
 		if component.Name != "VEVENT" {
 			continue
 		}
-		
+
 		// Check if this is the same occurrence by matching RECURRENCE-ID
 		existingRecurrenceID := component.Props.Get("RECURRENCE-ID")
 		if existingRecurrenceID != nil && existingRecurrenceID.Value == recurrenceID.Value {
 			// Found the existing occurrence to update
 			foundExisting = true
-			
+
 			// Handle cancellations (METHOD:CANCEL)
 			if methodValue == "CANCEL" {
 				// For cancellations, we update the status to CANCELLED
@@ -135,7 +135,7 @@ func (s *MemoryStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, n
 			break
 		}
 	}
-	
+
 	// If we didn't find an existing occurrence with this RECURRENCE-ID, add it
 	if !foundExisting {
 		if methodValue == "CANCEL" {
@@ -147,14 +147,14 @@ func (s *MemoryStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, n
 			existingCal.Children = append(existingCal.Children, newEvent)
 		}
 	}
-	
+
 	// Encode the updated calendar back to bytes
 	var buf bytes.Buffer
 	encoder := ical.NewEncoder(&buf)
 	if err := encoder.Encode(existingCal); err != nil {
 		return fmt.Errorf("encoding updated calendar: %w", err)
 	}
-	
+
 	// Update the event in memory
 	s.events[uid].RawData = buf.Bytes()
 	return nil
@@ -183,7 +183,7 @@ func (s *MemoryStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 		Method:      event.Method,
 	}
 	copy(eventCopy.RawData, event.RawData)
-	
+
 	return eventCopy, nil
 }
 
