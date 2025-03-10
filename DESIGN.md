@@ -13,3 +13,10 @@ Separate modules for parsing mails and storing the calendar events in the databa
 
 The calendar events come via mail as text/calendar attachments. We implement a storage interface for storing calendar events. We use the UID as the primary key for the events. The storage module provides methods for creating, updating, and deleting events.
 
+## Testing 
+
+The test mails are stored in the test/mail/ directory. We aim provide a test suite of realistic test mails to ensure the correctness of the parser and storage modules.
+
+When testing the vdir storage module, we use the test/vdir directory. 
+
+
