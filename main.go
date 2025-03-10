@@ -16,6 +16,7 @@ func main() {
 	// Define flags
 	jsonOutput := flag.Bool("json", false, "Output in JSON format")
 	storeEvent := flag.Bool("store", false, "Store calendar event if found")
+	processReplies := flag.Bool("process-replies", true, "Process attendance replies to update events")
 	
 	// Storage options
 	vdirPath := flag.String("vdir", "", "Path to vdir storage directory")
@@ -55,7 +56,7 @@ func main() {
 	}
 
 	// Initialize the processor
-	proc := processor.NewProcessor(store)
+	proc := processor.NewProcessor(store, *processReplies)
 
 	// Process the email
 	if err := proc.ProcessEmail(os.Stdin, *jsonOutput, *storeEvent); err != nil {

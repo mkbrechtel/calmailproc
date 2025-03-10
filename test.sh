@@ -22,6 +22,12 @@ $calmailproc $vdir_args < test/mails/example-mail-05.eml
 $calmailproc $vdir_args < test/mails/example-mail-07.eml
 $calmailproc $vdir_args < test/mails/example-mail-06.eml
 
+# Process remaining emails (8-14) to test various scenarios
+for file in test/mails/example-mail-0[8-9].eml test/mails/example-mail-1[0-4].eml; do
+    echo "Processing $file (vdir)"
+    $calmailproc $vdir_args < "$file"
+done
+
 # Verify the vdir storage
 uid="040000008200E00074C5B7101A82E0080000000044440AFCBB91DB0100000000000000001000000087598F58784D4541BAA76F1829CFE9A1"
 if [ -f "test/vdir/$uid.ics" ]; then
@@ -65,6 +71,12 @@ $calmailproc $icalfile_args < test/mails/example-mail-05.eml
 $calmailproc $icalfile_args < test/mails/example-mail-07.eml
 $calmailproc $icalfile_args < test/mails/example-mail-06.eml
 
+# Process remaining emails (8-14) to test various scenarios
+for file in test/mails/example-mail-0[8-9].eml test/mails/example-mail-1[0-4].eml; do
+    echo "Processing $file (icalfile)"
+    $calmailproc $icalfile_args < "$file"
+done
+
 # Verify the icalfile storage
 if [ -f "test/calendar.ics" ]; then
     echo "icalfile: Success - Calendar file exists"
@@ -95,6 +107,41 @@ if [ -f "test/calendar.ics" ]; then
     fi
 else
     echo "icalfile: Error - Calendar file not found"
+    exit 1
+fi
+
+echo
+echo "=== Testing METHOD:REPLY handling ==="
+reply_vdir="test/reply_vdir"
+rm -rf "$reply_vdir"
+
+# First test with process-replies=true (default)
+echo "Testing with process-replies=true"
+$calmailproc -store -vdir "$reply_vdir" < test/mails/example-mail-11.eml
+echo "Processing REPLY with process-replies=true"
+$calmailproc -store -vdir "$reply_vdir" < test/mails/example-mail-12.eml
+
+# Count how many files were created
+files_count=$(find "$reply_vdir" -type f | wc -l)
+echo "Files in vdir with process-replies=true: $files_count"
+
+# Now test with process-replies=false
+reply_vdir_no="test/reply_vdir_no"
+rm -rf "$reply_vdir_no"
+
+echo "Testing with process-replies=false"
+$calmailproc -store -vdir "$reply_vdir_no" < test/mails/example-mail-11.eml
+echo "Processing REPLY with process-replies=false"
+$calmailproc -store -vdir "$reply_vdir_no" --process-replies=false < test/mails/example-mail-12.eml
+
+# Count how many files were created
+files_count_no=$(find "$reply_vdir_no" -type f | wc -l)
+echo "Files in vdir with process-replies=false: $files_count_no"
+
+if [ "$files_count" -gt "$files_count_no" ]; then
+    echo "METHOD:REPLY handling working correctly"
+else
+    echo "ERROR: METHOD:REPLY handling did not work as expected"
     exit 1
 fi
 

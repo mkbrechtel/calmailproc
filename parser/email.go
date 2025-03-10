@@ -34,6 +34,7 @@ type CalendarEvent struct {
 	Location    string
 	Organizer   string
 	Description string
+	Method      string // Calendar method (REQUEST, REPLY, CANCEL, etc.)
 }
 
 // ParseEmail parses an email from an io.Reader and extracts calendar data if present
@@ -138,6 +139,12 @@ func extractBasicCalendarInfo(icsData []byte) (*CalendarEvent, error) {
 	// Store the raw data
 	event := &CalendarEvent{
 		RawData: icsData,
+	}
+	
+	// Extract METHOD if present at calendar level
+	methodProp := cal.Props.Get("METHOD")
+	if methodProp != nil {
+		event.Method = methodProp.Value
 	}
 
 	// Find the first VEVENT component

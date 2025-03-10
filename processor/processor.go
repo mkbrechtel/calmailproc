@@ -10,13 +10,15 @@ import (
 
 // Processor handles processing emails with calendar events
 type Processor struct {
-	Storage storage.Storage
+	Storage        storage.Storage
+	ProcessReplies bool // Whether to process METHOD:REPLY to update attendee status
 }
 
 // NewProcessor creates a new processor with the given storage
-func NewProcessor(storage storage.Storage) *Processor {
+func NewProcessor(storage storage.Storage, processReplies bool) *Processor {
 	return &Processor{
-		Storage: storage,
+		Storage:        storage,
+		ProcessReplies: processReplies,
 	}
 }
 
@@ -28,10 +30,17 @@ func (p *Processor) ProcessEmail(r io.Reader, jsonOutput bool, storeEvent bool) 
 		return fmt.Errorf("parsing email: %w", err)
 	}
 
-	// Store the event if requested and a calendar event was found
+	// Process the calendar event if one was found
 	if storeEvent && email.HasCalendar && email.Event.UID != "" {
-		if err := p.Storage.StoreEvent(&email.Event); err != nil {
-			return fmt.Errorf("storing event: %w", err)
+		// Check if this is a METHOD:REPLY that we should ignore
+		if email.Event.Method == "REPLY" && !p.ProcessReplies {
+			// Skip storing REPLY events when ProcessReplies is false
+			fmt.Println("Ignoring calendar REPLY method as configured")
+		} else {
+			// Store the event
+			if err := p.Storage.StoreEvent(&email.Event); err != nil {
+				return fmt.Errorf("storing event: %w", err)
+			}
 		}
 	}
 
@@ -56,8 +65,11 @@ func outputJSON(email *parser.Email) {
 	if email.HasCalendar {
 		fmt.Printf(",\n  \"event\": {\n")
 		fmt.Printf("    \"uid\": %q,\n", email.Event.UID)
-		fmt.Printf("    \"summary\": %q\n", email.Event.Summary)
-		fmt.Printf("  }")
+		fmt.Printf("    \"summary\": %q", email.Event.Summary)
+		if email.Event.Method != "" {
+			fmt.Printf(",\n    \"method\": %q", email.Event.Method)
+		}
+		fmt.Printf("\n  }")
 	}
 
 	fmt.Println("\n}")
@@ -75,5 +87,8 @@ func outputPlainText(email *parser.Email) {
 		fmt.Println("\nCalendar Event:")
 		fmt.Printf("  UID: %s\n", email.Event.UID)
 		fmt.Printf("  Summary: %s\n", email.Event.Summary)
+		if email.Event.Method != "" {
+			fmt.Printf("  Method: %s\n", email.Event.Method)
+		}
 	}
 }
