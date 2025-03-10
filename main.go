@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/mkbrechtel/calmailproc/processor"
+	"github.com/mkbrechtel/calmailproc/processor/maildir"
 	"github.com/mkbrechtel/calmailproc/storage"
 	"github.com/mkbrechtel/calmailproc/storage/icalfile"
 	"github.com/mkbrechtel/calmailproc/storage/vdir"
@@ -17,11 +18,15 @@ func main() {
 	jsonOutput := flag.Bool("json", false, "Output in JSON format")
 	storeEvent := flag.Bool("store", false, "Store calendar event if found")
 	processReplies := flag.Bool("process-replies", true, "Process attendance replies to update events")
-	
+
 	// Storage options
 	vdirPath := flag.String("vdir", "", "Path to vdir storage directory")
 	icalfilePath := flag.String("icalfile", "", "Path to single iCalendar file storage")
-	
+
+	// Input options
+	maildirPath := flag.String("maildir", "", "Path to maildir to process (will process all emails recursively)")
+	verbose := flag.Bool("verbose", false, "Enable verbose logging output")
+
 	flag.Parse()
 
 	// Initialize the appropriate storage
@@ -29,7 +34,7 @@ func main() {
 		store storage.Storage
 		err   error
 	)
-	
+
 	switch {
 	case *vdirPath != "":
 		// Use vdir storage if specified
@@ -58,7 +63,16 @@ func main() {
 	// Initialize the processor
 	proc := processor.NewProcessor(store, *processReplies)
 
-	// Process the email
+	// Process maildir if specified
+	if *maildirPath != "" {
+		if err := maildir.Process(*maildirPath, proc, *jsonOutput, *storeEvent, *verbose); err != nil {
+			fmt.Fprintf(os.Stderr, "Error processing maildir: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// Default: process from stdin
 	if err := proc.ProcessEmail(os.Stdin, *jsonOutput, *storeEvent); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
