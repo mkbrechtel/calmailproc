@@ -1,5 +1,7 @@
 # calmailproc
 
+![Build Status](https://github.com/mkbrechtel/calmailproc/actions/workflows/test-build.yml/badge.svg)
+
 A calendar mail processor that extracts calendar event information from email files (.eml) containing iCalendar (.ics) data.
 
 ## Features
@@ -12,13 +14,21 @@ A calendar mail processor that extracts calendar event information from email fi
 
 ## Installation
 
+### From Source
+
 ```bash
 # Clone the repository
 git clone https://github.com/mkbrechtel/calmailproc.git
 cd calmailproc
 
 # Build the application
-go build -o calmailproc ./cmd/calmailproc
+go build -o calmailproc
+```
+
+### Using Go Install
+
+```bash
+go install github.com/mkbrechtel/calmailproc@latest
 ```
 
 ## Usage
@@ -76,6 +86,27 @@ JSON:
   }
 }
 ```
+
+## Development
+
+### Running Tests
+
+```bash
+go test ./...
+```
+
+### Formatting Code
+
+```bash
+go fmt ./...
+```
+
+## GitHub Workflows
+
+This project uses GitHub Actions for continuous integration:
+
+- **Test and Build**: Ensures code quality by running tests and verifying that the code builds successfully across different Go versions
+- **Release**: Automatically creates binaries for multiple platforms when a new tag is pushed
 
 ## Future Improvements
 

@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Get dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Build for all platforms
+        run: |
+          # Linux
+          GOOS=linux GOARCH=amd64 go build -o calmailproc-linux-amd64
+          GOOS=linux GOARCH=arm64 go build -o calmailproc-linux-arm64
+          
+          # macOS
+          GOOS=darwin GOARCH=amd64 go build -o calmailproc-darwin-amd64
+          GOOS=darwin GOARCH=arm64 go build -o calmailproc-darwin-arm64
+          
+          # Windows
+          GOOS=windows GOARCH=amd64 go build -o calmailproc-windows-amd64.exe
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            calmailproc-linux-amd64
+            calmailproc-linux-arm64
+            calmailproc-darwin-amd64
+            calmailproc-darwin-arm64
+            calmailproc-windows-amd64.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
