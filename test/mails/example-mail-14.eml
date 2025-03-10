@@ -1,0 +1,146 @@
+X-Mozilla-Status: 0001
+X-Mozilla-Status2: 00000000
+Return-Path: <markus.brechtel@uk-koeln.de>
+Delivered-To: markus.brechtel@thengo.net
+Received: from mail02.mindsky.de
+	by mail02.mindsky.de with LMTP
+	id SeyBGvdWz2eYyjYADahEfg
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	for <markus.brechtel@thengo.net>; Mon, 10 Mar 2025 22:17:43 +0100
+Received: by mail02.mindsky.de (Postfix, from userid 5004)
+	id 647B17FD34; Mon, 10 Mar 2025 22:17:43 +0100 (CET)
+X-Spam-Checker-Version: SpamAssassin 3.4.6 (2021-04-09) on mail02.mindsky.de
+X-Spam-Level: 
+X-Spam-Status: No, score=-1.9 required=5.0 tests=BAYES_00,HTML_MESSAGE,
+	RCVD_IN_DNSWL_BLOCKED,RCVD_IN_MSPIKE_H4,RCVD_IN_MSPIKE_WL,
+	RCVD_IN_VALIDITY_RPBL_BLOCKED,RCVD_IN_VALIDITY_SAFE_BLOCKED,
+	RCVD_IN_ZEN_BLOCKED_OPENDNS autolearn=ham autolearn_force=no
+	version=3.4.6
+Received: from mail-out-v1.uni-koeln.de (mail-out-v1.uni-koeln.de [134.95.86.58])
+	(using TLSv1.2 with cipher DHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+	(No client certificate requested)
+	by mail02.mindsky.de (Postfix) with ESMTPS id 601EC7FCD2
+	for <markus.brechtel@thengo.net>; Mon, 10 Mar 2025 22:17:40 +0100 (CET)
+X-CSE-ConnectionGUID: cXI3mrUDQZCHzE2zMpixpg==
+X-CSE-MsgGUID: rfDfwCJCS0iaXvm3vEDktQ==
+X-IPAS-Result: =?us-ascii?q?A+CTOwBOVs9n/wCiACoSAIIYWhkBAQEBAQE8AQEBAQEBA?=
+ =?us-ascii?q?QEBAQEBAgEBAQEBAQEBAQEBgWgCMASBCxsCAQEBAYMVS4Q4WaMuhSuGVYFrE?=
+ =?us-ascii?q?w8BDAMBARQwBAEBhR+LAyg2Bw4BAgQBAQEBAwIDAQEBAQEBAQEBAQELAQEGA?=
+ =?us-ascii?q?QEBAQEBBgWBIYU1U4Z6CmgBCwECPAIELycEG4UXDTuwbAKBMoEBhHzZOIFeE?=
+ =?us-ascii?q?IFGAgEBAQEBAYVmgmMBKoEygx9vAYUtgVVEhH2BD4JohCeCaQSCL4UnqRosg?=
+ =?us-ascii?q?RtLMywBDxE1ExcLBwWBbAOBD4FGQzc3ggxpSToCDQI1ght8giuDFHdChDyEQ?=
+ =?us-ascii?q?YVQghGCBYkthGQuMh1AAwsHZj03FBsGAgGBNZx3gQ6BE4ECChCgZ4tRgXuhP?=
+ =?us-ascii?q?jQHgjiBZoFdBgyfYS4Xl0YOkwOYfqkJAgQCBAUCFgGBbgWCCU0kgzdRFwIP2?=
+ =?us-ascii?q?R2BTQmQSAGBHAEB?=
+IronPort-Data: A9a23:ewnKA6MBbK7m+CfvrR3DlsFynXyQoLVcMsEvi/4bfWQNrUomgTUPy
+ WZMDDuEbvmIY2H2f9h+PNm090pS65/Sx9FmSnM5pCpnJ55oRWgpJvzCdxutYHnCRiHnZBg6h
+ ynLQoCYdKjYdleF+FH1dOCn9SQgvU2xbuKUIPbePSxsThNTRi4kiBZy88Y0mYcAbeKRWmthg
+ vus5ZSDULOZ82QsaD9MsPvb8EkHUMna4Vv0gHRuPZing3eG/5UlJMp3Db28KXL+Xr5VEoaSL
+ 87fzKu093/u5BwkDNWoiN7TKiXmlZaLYGBiIlIPM0STqkAqSh4ai87XB9JAAatjsAhlqvgqo
+ Dl7WT1cfi9yVkHEsLx1vxC1iEiSN4UekFPMCSDXXcB+UyQqflO0q8iCAn3aMqUTyscsBHtz2
+ cUqAxAfQ0qRovq30Kq0H7wEasQLdKEHPasEv214iDbEEbM8Qc+FWb/Yo8Je3XIzgc1KG7DSa
+ qL1axI1ZUyYMRQVYg9FUMBnxrX63yCvG9FbgAv9Sa4f5mHJzxFqlrL3PdHVZtGObdhW20Wfq
+ 2bAuWj0av0fHIzCk2HfrSLEaunnhy3XVp05NpaDrv9jsEOWnXI+JB4KbA7uyRW+ogvkMz5FE
+ GQR8zAtsLN0/lamRdnhUhmQvH6JuBEbHdxdD4UHBBql0a/I+0OeG3RBVD4eLsY8pokrQz1v1
+ ViEm9WvCTEHXKCpdE9xP4y89VuaURX550dbDcPYZWPpO+Xenbw=
+IronPort-HdrOrdr: A9a23:rdvsn6quB9OkUqfPieAW+WUaV5oMeYIsimQD101hICG9Kvbo8f
+ xG785rrCMc6QxhJU3I9urwXJVoLUm8yXcX2/hsAV7BZniAhILAFugLhuaPrFPd8kbFh41gPN
+ JbAs1D4arLfDpHZKjBgDVQWOxQuOVvuJrY/tv2/jNIdykvUYFYhj0SNu72f3cGOzWuK6BJbq
+ ah2g==
+X-Talos-CUID: 9a23:lAVK5W5NRI5HWvF1ddss/341QcU/T1Hk/lzwMWLiG0NxSa2NRgrF
+X-Talos-MUID: 9a23:fc0avgkU82zDqQGqhP0Jdnp4Outm/I+MI3tVkJw2pczfKwFcOCuk2WE=
+X-IronPort-Anti-Spam-Filtered: true
+X-IronPort-AV: E=Sophos;i="6.14,237,1736809200"; 
+   d="scan'208,217";a="8523278"
+Received: from smtp-out-rh7.rrz.uni-koeln.de ([IPv6:2a00:a200:0:12::118])
+  by mail-out-v1.uni-koeln.de with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384; 10 Mar 2025 22:17:40 +0100
+Received: from smtp.uni-koeln.de (msa-node1-rh7.rrz.uni-koeln.de [IPv6:2a00:a200:0:15::202])
+	by smtp-out.rrz.uni-koeln.de (8.14.7/8.14.7) with ESMTP id 52ALHdhZ096561
+	for <markus.brechtel@thengo.net>; Mon, 10 Mar 2025 22:17:39 +0100
+Received: from mail-gw.uk-koeln.de (mail-gw.uk-koeln.de [134.95.33.33])
+	by smtp.uni-koeln.de (8.14.7/8.14.7) with ESMTP id 52ALHdI8017180
+	(version=TLSv1/SSLv3 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NOT)
+	for <markus.brechtel@thengo.net>; Mon, 10 Mar 2025 22:17:39 +0100
+Received: from w-exch-db03.ads.uk-koeln.de ([134.95.197.235]:46416 helo=owa.uk-koeln.de)
+	by mail-gw.uk-koeln.de with esmtps  (TLS1.2) tls TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+	(Exim 4.96)
+	(envelope-from <markus.brechtel@uk-koeln.de>)
+	id 1trkV9-000000004Hz-3Lj6
+	for markus.brechtel@thengo.net;
+	Mon, 10 Mar 2025 22:17:31 +0100
+Received: from W-EXCH-DB02.ADS.UK-KOELN.DE (134.95.197.234) by
+ W-EXCH-DB03.ADS.UK-KOELN.DE (134.95.197.235) with Microsoft SMTP Server
+ (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id
+ 15.1.2507.39; Mon, 10 Mar 2025 22:17:31 +0100
+Received: from W-EXCH-DB02.ADS.UK-KOELN.DE ([fe80::a102:8171:65d2:3894]) by
+ W-EXCH-DB02.ADS.UK-KOELN.DE ([fe80::a102:8171:65d2:3894%3]) with mapi id
+ 15.01.2507.039; Mon, 10 Mar 2025 22:17:31 +0100
+From: Markus Brechtel <markus.brechtel@uk-koeln.de>
+To: Markus Katharina Brechtel <markus.brechtel@thengo.net>
+Subject: Abgelehnt: Einladung: Test 6
+Thread-Topic: Einladung: Test 6
+Thread-Index: AQHbkgHVwILc/7fn8kWYGcBcbA3wzw==
+Date: Mon, 10 Mar 2025 21:17:31 +0000
+Message-ID: <2bd4aac1442347af9124290e44642279@uk-koeln.de>
+Accept-Language: de-DE, en-US
+Content-Language: de-DE
+X-MS-Has-Attach:
+X-MS-TNEF-Correlator:
+x-originating-ip: [134.95.33.58]
+Content-Type: multipart/alternative;
+	boundary="_000_2bd4aac1442347af9124290e44642279ukkoelnde_"
+MIME-Version: 1.0
+X-Scanned-By: MIMEDefang 3.3
+
+--_000_2bd4aac1442347af9124290e44642279ukkoelnde_
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+
+no, sorry
+
+--_000_2bd4aac1442347af9124290e44642279ukkoelnde_
+Content-Type: text/html; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
+
+<html>
+<head>
+<meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Diso-8859-=
+1">
+<style type=3D"text/css" style=3D"display:none;"><!-- P {margin-top:0;margi=
+n-bottom:0;} --></style>
+</head>
+<body dir=3D"ltr">
+<div id=3D"divtagdefaultwrapper" style=3D"font-size:12pt;color:#000000;font=
+-family:Calibri,Helvetica,sans-serif;" dir=3D"ltr">
+<p>no, sorry</p>
+</div>
+</body>
+</html>
+
+--_000_2bd4aac1442347af9124290e44642279ukkoelnde_
+Content-Type: text/calendar; charset="utf-8"; method=REPLY
+Content-Transfer-Encoding: base64
+
+QkVHSU46VkNBTEVOREFSDQpNRVRIT0Q6UkVQTFkNClBST0RJRDpNaWNyb3NvZnQgRXhjaGFuZ2Ug
+U2VydmVyIDIwMTANClZFUlNJT046Mi4wDQpCRUdJTjpWVElNRVpPTkUNClRaSUQ6RXVyb3BlL0Jl
+cmxpbg0KQkVHSU46U1RBTkRBUkQNCkRUU1RBUlQ6MTYwMTAxMDFUMDMwMDAwDQpUWk9GRlNFVEZS
+T006KzAyMDANClRaT0ZGU0VUVE86KzAxMDANClJSVUxFOkZSRVE9WUVBUkxZO0lOVEVSVkFMPTE7
+QllEQVk9LTFTVTtCWU1PTlRIPTEwDQpFTkQ6U1RBTkRBUkQNCkJFR0lOOkRBWUxJR0hUDQpEVFNU
+QVJUOjE2MDEwMTAxVDAyMDAwMA0KVFpPRkZTRVRGUk9NOiswMTAwDQpUWk9GRlNFVFRPOiswMjAw
+DQpSUlVMRTpGUkVRPVlFQVJMWTtJTlRFUlZBTD0xO0JZREFZPS0xU1U7QllNT05USD0zDQpFTkQ6
+REFZTElHSFQNCkVORDpWVElNRVpPTkUNCkJFR0lOOlZFVkVOVA0KQVRURU5ERUU7UEFSVFNUQVQ9
+REVDTElORUQ7Q049TWFya3VzIEJyZWNodGVsOk1BSUxUTzptYXJrdXMuYnJlY2h0ZWxAdWsta29l
+DQogbG4uZGUNCkNPTU1FTlQ7TEFOR1VBR0U9ZGUtREU6bm9cLCBzb3JyeVxuDQpVSUQ6YWJjZmFj
+ZDMtNGRiMy00YzQyLWJjZjUtMGMxNzc1MmM2NWZiDQpTVU1NQVJZO0xBTkdVQUdFPWRlLURFOkFi
+Z2VsZWhudDogRWlubGFkdW5nOiBUZXN0IDYNCkRUU1RBUlQ7VFpJRD1FdXJvcGUvQmVybGluOjIw
+MjUwMzE4VDA5MTUwMA0KRFRFTkQ7VFpJRD1FdXJvcGUvQmVybGluOjIwMjUwMzE4VDEwMTUwMA0K
+Q0xBU1M6UFVCTElDDQpQUklPUklUWTo1DQpEVFNUQU1QOjIwMjUwMzEwVDIxMTczMVoNClRSQU5T
+UDpPUEFRVUUNClNUQVRVUzpDT05GSVJNRUQNClNFUVVFTkNFOjANClgtTUlDUk9TT0ZULUNETy1B
+UFBULVNFUVVFTkNFOjANClgtTUlDUk9TT0ZULUNETy1PV05FUkFQUFRJRDowDQpYLU1JQ1JPU09G
+VC1DRE8tQlVTWVNUQVRVUzpCVVNZDQpYLU1JQ1JPU09GVC1DRE8tSU5URU5ERURTVEFUVVM6QlVT
+WQ0KWC1NSUNST1NPRlQtQ0RPLUFMTERBWUVWRU5UOkZBTFNFDQpYLU1JQ1JPU09GVC1DRE8tSU1Q
+T1JUQU5DRToxDQpYLU1JQ1JPU09GVC1DRE8tSU5TVFRZUEU6MA0KWC1NSUNST1NPRlQtRE9OT1RG
+T1JXQVJETUVFVElORzpGQUxTRQ0KWC1NSUNST1NPRlQtRElTQUxMT1ctQ09VTlRFUjpGQUxTRQ0K
+RU5EOlZFVkVOVA0KRU5EOlZDQUxFTkRBUg0K
+
+--_000_2bd4aac1442347af9124290e44642279ukkoelnde_--
