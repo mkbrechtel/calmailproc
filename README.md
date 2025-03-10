@@ -1,6 +1,6 @@
 # calmailproc
 
-![Build Status](https://github.com/mkbrechtel/calmailproc/actions/workflows/test-build.yml/badge.svg)
+[![Build Status](https://github.com/mkbrechtel/calmailproc/actions/workflows/test-build.yml/badge.svg)](https://github.com/mkbrechtel/calmailproc/actions/workflows/test-build.yml)
 
 A calendar mail processor that extracts calendar event information from email files (.eml) containing iCalendar (.ics) data.
 

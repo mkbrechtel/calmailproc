@@ -12,14 +12,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: [ '1.18', '1.19', '1.20', '1.21' ]
+        go-version: [ '1.19', '1.20', '1.21', '1.22' ]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
 
@@ -28,6 +28,11 @@ jobs:
 
       - name: Run tests
         run: go test -v ./...
+        
+      - name: Run linting
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
 
   build:
     name: Build
@@ -35,18 +40,18 @@ jobs:
     needs: test
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.22'
 
       - name: Build
         run: go build -v .
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: calmailproc
           path: calmailproc
