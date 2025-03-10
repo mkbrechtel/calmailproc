@@ -30,9 +30,15 @@ func TestProcess_EmptyMaildir(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	// Create the maildir structure (empty)
-	os.Mkdir(filepath.Join(tempDir, "new"), 0755)
-	os.Mkdir(filepath.Join(tempDir, "cur"), 0755)
-	os.Mkdir(filepath.Join(tempDir, "tmp"), 0755)
+	if err := os.Mkdir(filepath.Join(tempDir, "new"), 0755); err != nil {
+		t.Fatalf("Failed to create new directory: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(tempDir, "cur"), 0755); err != nil {
+		t.Fatalf("Failed to create cur directory: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(tempDir, "tmp"), 0755); err != nil {
+		t.Fatalf("Failed to create tmp directory: %v", err)
+	}
 
 	// Create a processor with memory storage
 	store := memory.NewMemoryStorage()
