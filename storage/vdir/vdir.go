@@ -42,11 +42,126 @@ func (s *VDirStorage) StoreEvent(event *parser.CalendarEvent) error {
 	filename := fmt.Sprintf("%s.ics", event.UID)
 	filePath := filepath.Join(s.BasePath, filename)
 
-	// Write the raw calendar data to the file
+	// Parse the iCalendar data
+	cal, err := ical.NewDecoder(bytes.NewReader(event.RawData)).Decode()
+	if err != nil {
+		// If we can't parse it, just store the raw data as before
+		if err := os.WriteFile(filePath, event.RawData, 0644); err != nil {
+			return fmt.Errorf("writing calendar file: %w", err)
+		}
+		return nil
+	}
+	
+	// Extract the METHOD if present
+	methodValue := ""
+	methodProp := cal.Props.Get("METHOD")
+	if methodProp != nil {
+		methodValue = methodProp.Value
+	}
+
+	// Check if file already exists - could be a recurring event update
+	existingData, err := os.ReadFile(filePath)
+	if err != nil {
+		// File doesn't exist yet, create new
+		if err := os.WriteFile(filePath, event.RawData, 0644); err != nil {
+			return fmt.Errorf("writing calendar file: %w", err)
+		}
+		return nil
+	}
+
+	// File exists, check if we need to merge this event with existing data
+	existingCal, err := ical.NewDecoder(bytes.NewReader(existingData)).Decode()
+	if err != nil {
+		// Can't parse existing, overwrite with new data
+		if err := os.WriteFile(filePath, event.RawData, 0644); err != nil {
+			return fmt.Errorf("writing calendar file: %w", err)
+		}
+		return nil
+	}
+
+	// Extract the current event from the new data
+	var newEvent *ical.Component
+	for _, component := range cal.Children {
+		if component.Name == "VEVENT" {
+			newEvent = component
+			break
+		}
+	}
+	if newEvent == nil {
+		return fmt.Errorf("no VEVENT component found in calendar data")
+	}
+
+	// Check if this is a modification to a specific occurrence (has RECURRENCE-ID)
+	recurrenceID := newEvent.Props.Get("RECURRENCE-ID")
+	if recurrenceID != nil {
+		// This is an update to a specific occurrence
+		return s.handleRecurringEventUpdate(existingCal, newEvent, methodValue, filePath)
+	}
+
+	// This is a new master event or a complete update
+	// Just write the new data, overwriting the old file
 	if err := os.WriteFile(filePath, event.RawData, 0644); err != nil {
 		return fmt.Errorf("writing calendar file: %w", err)
 	}
 
+	return nil
+}
+
+// handleRecurringEventUpdate merges a recurring event update into the existing calendar file
+func (s *VDirStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, newEvent *ical.Component, methodValue string, filePath string) error {
+	recurrenceID := newEvent.Props.Get("RECURRENCE-ID")
+	if recurrenceID == nil {
+		return fmt.Errorf("missing RECURRENCE-ID in event update")
+	}
+	
+	// Find if this specific occurrence already exists in the calendar
+	foundExisting := false
+	for i, component := range existingCal.Children {
+		if component.Name != "VEVENT" {
+			continue
+		}
+		
+		// Check if this is the same occurrence by matching RECURRENCE-ID
+		existingRecurrenceID := component.Props.Get("RECURRENCE-ID")
+		if existingRecurrenceID != nil && existingRecurrenceID.Value == recurrenceID.Value {
+			// Found the existing occurrence to update
+			foundExisting = true
+			
+			// Handle cancellations (METHOD:CANCEL)
+			if methodValue == "CANCEL" {
+				// For cancellations, we update the status to CANCELLED
+				component.Props.Set(&ical.Prop{Name: "STATUS", Value: "CANCELLED"})
+			} else {
+				// Replace the existing occurrence with the new one
+				existingCal.Children[i] = newEvent
+			}
+			break
+		}
+	}
+	
+	// If we didn't find an existing occurrence with this RECURRENCE-ID, add it
+	if !foundExisting {
+		if methodValue == "CANCEL" {
+			// For cancellations of instances we haven't seen before, create a new component with STATUS:CANCELLED
+			newEvent.Props.Set(&ical.Prop{Name: "STATUS", Value: "CANCELLED"})
+			existingCal.Children = append(existingCal.Children, newEvent)
+		} else {
+			// Add the new occurrence
+			existingCal.Children = append(existingCal.Children, newEvent)
+		}
+	}
+	
+	// Write the updated calendar back to the file
+	var buf bytes.Buffer
+	encoder := ical.NewEncoder(&buf)
+	if err := encoder.Encode(existingCal); err != nil {
+		return fmt.Errorf("encoding updated calendar: %w", err)
+	}
+	
+	if err := os.WriteFile(filePath, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("writing updated calendar file: %w", err)
+	}
+	
 	return nil
 }
 
