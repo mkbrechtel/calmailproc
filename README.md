@@ -107,45 +107,6 @@ The tool is designed to be used in standard Unix mail pipelines. For example:
 | calmailproc -store -vdir ~/.calendar/invitations > /path/to/logs/calendar.log
 ```
 
-### Example output
-
-Plain text:
-```
-Subject: Team Meeting
-From: Alice <alice@example.com>
-To: Team <team@example.com>
-Date: 2025-03-10 09:41:35
-
-Calendar Event:
-  UID: team-meeting-2025-03-10@example.com
-  Summary: Team Meeting
-  Start: 2025-03-10 14:00:00
-  End: 2025-03-10 15:00:00
-  Location: Meeting Room A
-  Organizer: Alice
-  Method: REQUEST
-```
-
-JSON:
-```json
-{
-  "subject": "Team Meeting",
-  "from": "Alice <alice@example.com>",
-  "to": "Team <team@example.com>",
-  "date": "2025-03-10T09:41:35Z",
-  "has_calendar": true,
-  "event": {
-    "uid": "team-meeting-2025-03-10@example.com",
-    "summary": "Team Meeting",
-    "start": "2025-03-10T14:00:00+01:00",
-    "end": "2025-03-10T15:00:00+01:00",
-    "location": "Meeting Room A",
-    "organizer": "Alice",
-    "method": "REQUEST"
-  }
-}
-```
-
 ## Storage Formats
 
 ### vdir
