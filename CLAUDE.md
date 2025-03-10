@@ -23,9 +23,8 @@ A calendar mail processor written in pure Go.
 - **Types**: Use strong typing, avoid interface{} when possible
 
 ## Project Structure
-- `cmd/calmailproc/` - Main application entry point
-- `internal/parser/` - Email and calendar parsing logic
-- `test/` - Test data, example emails
+
+see DESIGN.md
 
 ## Implementation Lessons
 - Prefer standard library's `net/mail` package for basic email parsing rather than third-party libraries when possible
