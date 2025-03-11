@@ -36,6 +36,7 @@ type CalendarEvent struct {
 	Organizer   string
 	Description string
 	Method      string // Calendar method (REQUEST, REPLY, CANCEL, etc.)
+	Sequence    int    // Sequence number for event updates
 }
 
 // ParseEmail parses an email from an io.Reader and extracts calendar data if present
@@ -197,6 +198,16 @@ func extractBasicCalendarInfo(icsData []byte) (*CalendarEvent, error) {
 			event.Summary = summaryProp.Value
 		} else {
 			event.Summary = "Event without summary"
+		}
+
+		// Extract SEQUENCE (optional)
+		sequenceProp := component.Props.Get("SEQUENCE")
+		if sequenceProp != nil {
+			// Try to parse the sequence number, default to 0 if invalid
+			var seq int
+			if _, err := fmt.Sscanf(sequenceProp.Value, "%d", &seq); err == nil {
+				event.Sequence = seq
+			}
 		}
 
 		return event, nil

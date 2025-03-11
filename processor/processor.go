@@ -37,9 +37,24 @@ func (p *Processor) ProcessEmail(r io.Reader, jsonOutput bool, storeEvent bool) 
 			// Skip storing REPLY events when ProcessReplies is false
 			fmt.Println("Ignoring calendar REPLY method as configured")
 		} else {
-			// Store the event
-			if err := p.Storage.StoreEvent(&email.Event); err != nil {
-				return fmt.Errorf("storing event: %w", err)
+			// Check for existing event with the same UID
+			existingEvent, err := p.Storage.GetEvent(email.Event.UID)
+			if err == nil && existingEvent != nil {
+				// Only update if the sequence number is higher or equal (equal for backward compatibility)
+				if email.Event.Sequence < existingEvent.Sequence {
+					fmt.Printf("Ignoring event update with lower sequence number (%d < %d)\n", 
+						email.Event.Sequence, existingEvent.Sequence)
+				} else {
+					// Store the event with higher/equal sequence
+					if err := p.Storage.StoreEvent(&email.Event); err != nil {
+						return fmt.Errorf("storing event: %w", err)
+					}
+				}
+			} else {
+				// No existing event found, store the new one
+				if err := p.Storage.StoreEvent(&email.Event); err != nil {
+					return fmt.Errorf("storing event: %w", err)
+				}
 			}
 		}
 	}
@@ -65,7 +80,8 @@ func outputJSON(email *parser.Email) {
 	if email.HasCalendar {
 		fmt.Printf(",\n  \"event\": {\n")
 		fmt.Printf("    \"uid\": %q,\n", email.Event.UID)
-		fmt.Printf("    \"summary\": %q", email.Event.Summary)
+		fmt.Printf("    \"summary\": %q,\n", email.Event.Summary)
+		fmt.Printf("    \"sequence\": %d", email.Event.Sequence)
 		if email.Event.Method != "" {
 			fmt.Printf(",\n    \"method\": %q", email.Event.Method)
 		}
@@ -87,6 +103,7 @@ func outputPlainText(email *parser.Email) {
 		fmt.Println("\nCalendar Event:")
 		fmt.Printf("  UID: %s\n", email.Event.UID)
 		fmt.Printf("  Summary: %s\n", email.Event.Summary)
+		fmt.Printf("  Sequence: %d\n", email.Event.Sequence)
 		if email.Event.Method != "" {
 			fmt.Printf("  Method: %s\n", email.Event.Method)
 		}
