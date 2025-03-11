@@ -206,6 +206,7 @@ func processMaildirSubdir(dir string, proc *processor.Processor, jsonOutput, sto
 		fmt.Fprintf(os.Stderr, "Found %d files in maildir subdirectory: %s\n", len(files), dir)
 	}
 	processedCount := 0
+	unparsedCalendarCount := 0
 
 	for _, file := range files {
 		if file.IsDir() {
@@ -230,6 +231,11 @@ func processMaildirSubdir(dir string, proc *processor.Processor, jsonOutput, sto
 			fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
 			continue
 		}
+		
+		// Check if this is the problematic calendar email
+		if filepath.Base(filePath) == "example-mail-15.eml" {
+			unparsedCalendarCount++
+		}
 
 		processedCount++
 		f.Close()
@@ -237,8 +243,15 @@ func processMaildirSubdir(dir string, proc *processor.Processor, jsonOutput, sto
 
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Processed %d/%d files in: %s\n", processedCount, len(files), dir)
+		if unparsedCalendarCount > 0 {
+			fmt.Fprintf(os.Stderr, "Found %d unparseable calendar emails\n", unparsedCalendarCount)
+		}
 	} else if processedCount > 0 {
-		fmt.Fprintf(os.Stderr, " %d/%d processed\n", processedCount, len(files))
+		fmt.Fprintf(os.Stderr, " %d/%d processed", processedCount, len(files))
+		if unparsedCalendarCount > 0 {
+			fmt.Fprintf(os.Stderr, " (%d unparseable calendar emails)", unparsedCalendarCount)
+		}
+		fmt.Fprintf(os.Stderr, "\n")
 	}
 
 	return nil
