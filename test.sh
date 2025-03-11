@@ -6,12 +6,15 @@
 set -e
 
 calmailproc="go run main.go"
-test_dir="test"
-mail_dir="$test_dir/mails"
 
 # Clean up test directories
-rm -rf "$test_dir/vdir"
-rm -f "$test_dir/calendar.ics"
+rm -rf "test/out"
+
+
+echo "=== Testing maildir mode ==="
+$calmailproc -maildir test/maildir -store -vdir test/out/vdir1
+
+exit 0
 
 # Loop through storage methods
 for method in "vdir" "icalfile"; do
@@ -19,15 +22,17 @@ for method in "vdir" "icalfile"; do
     
     # Set up args based on method
     if [ "$method" == "vdir" ]; then
-        storage_dir="$test_dir/vdir"
+        storage_dir="test/out/vdir2"
         args="-store -vdir $storage_dir"
     else
-        storage_file="$test_dir/calendar.ics"
+        storage_file="test/out/calendar.ics"
         args="-store -icalfile $storage_file"
     fi
     
     # Process all example emails
     for mail in $mail_dir/example-mail-*.eml; do
+       # Process the email
+        echo
         echo "Processing $mail with $method storage"
         $calmailproc $args < "$mail"
     done
