@@ -1,0 +1,67 @@
+X-Mozilla-Status: 0001
+X-Mozilla-Status2: 00000000
+Return-Path: <sxmailer+205258278e7@sixt.com>
+X-Original-To: markus.brechtel@thengo.net
+Received: from localhost (unknown [127.0.0.1])
+	by mindsky.de (Postfix) with ESMTP id B4AC4E0C12
+	for <markus.brechtel@thengo.net>; Thu, 27 Jul 2017 08:58:46 +0000 (UTC)
+X-Virus-Scanned: amavisd-new at mindsky.de
+Received: from mindsky.de ([127.0.0.1])
+	by localhost (mindsky.de [127.0.0.1]) (amavisd-new, port 10024)
+	with ESMTP id aydlOS-Wtzmf for <markus.brechtel@thengo.net>;
+	Thu, 27 Jul 2017 08:58:41 +0000 (UTC)
+Received: from mail-in1.sixt.de (unknown [217.9.102.11])
+	(using TLSv1.2 with cipher RC4-SHA (112/128 bits))
+	(No client certificate requested)
+	by mindsky.de (Postfix) with ESMTPS id 2AB80E2250
+	for <markus.brechtel@thengo.net>; Thu, 27 Jul 2017 08:58:41 +0000 (UTC)
+Message-Id: <7a6ef7$6evulu@mail-out.sixt.de>
+MIME-Version: 1.0
+Content-Type: multipart/mixed;
+ boundary="=_4eae6febab450ff78cf2e93518761c72"
+Date: Thu, 27 Jul 2017 10:57:23 +0200
+From: SIXT <reservierung@sixt.com>
+To: markus.brechtel@thengo.net
+Subject: =?ISO-8859-1?Q?Ihre_Reservierung_9853474513_am_31.07.2017,_Frankfurt_a._M._Truck_24h?=
+
+
+--=_4eae6febab450ff78cf2e93518761c72
+Content-Transfer-Encoding: base64
+Content-Type: text/calendar;
+ name=Sixt-RES-9853474513.ics
+Content-Disposition: attachment;
+ filename=Sixt-RES-9853474513.ics;
+ size=1309
+
+QkVHSU46VkNBTEVOREFSCkNBTFNDQUxFOkdSRUdPUklBTgpNRVRIT0Q6UFVC
+TElTSApWRVJTSU9OOjIuMApQUk9ESUQ6LS8vU2l4dC8vUkFDLy9FTgpCRUdJ
+TjpWRlJFRUJVU1kKRlJFRUJVU1k7RkJUWVBFPUZSRUU6MjAxNzA3MzFUMDcw
+MDAwWi8yMDE3MDczMVQyMTMwMDBaCk9SR0FOSVpFUjtDTj1TaXh0IFNFClVJ
+RDpTSVhUXzk4NTM0NzQ1MTMKRFRTVEFNUDoyMDE3MDcyN1QwODU3MjNaCkVO
+RDpWRlJFRUJVU1kKQkVHSU46VkVWRU5UCkNMQVNTOlBVQkxJQwpERVNDUklQ
+VElPTjpcbkRhcyBGYWhyemV1ZyBtaXQgZGVyIFJlc2VydmllcnVuZ3NudW1t
+ZXIgOTg1MzQ3NDUxMyBzdGVodCBhbSAzMS4wNy4yMDE3IHVtIDA5OjAwIFVo
+ciAoT3J0c3plaXQpIGbDvHIgU2llIGJlcmVpdC4gR2VidWNodGUgUsO8Y2tn
+YWJlOiBGcmFua2Z1cnQgYW0gTWFpbiBIYW5hdWVyIExhbmRzdHIuIDM0MCwg
+ZGVuIDMxLjA3LjIwMTcgdW0gMjM6MzAgVWhyXG5JbmZvcm1hdGlvbmVuIHp1
+ciBVbWJ1Y2h1bmcgb2RlciBTdG9ybmllcnVuZyBlaW5lciBSZXNlcnZpZXJ1
+bmcgZmluZGVuIFNpZSB1bnRlciBodHRwOi8vd3d3LnNpeHQuZGVcbgpEVFNU
+QVJUOjIwMTcwNzMxVDA3MDAwMFoKRFRTVEFNUDoyMDE3MDcyN1QwODU3MjNa
+CkRURU5EOjIwMTcwNzMxVDIxMzAwMFoKTE9DQVRJT046U2l4dCBGcmFua2Z1
+cnQgYS4gTS4gVHJ1Y2sgMjRoLCBIYW5hdWVyIExhbmRzdHIuIDM0MCwgNjAz
+MTQgRnJhbmtmdXJ0IGFtIE1haW4sIERFClBSSU9SSVRZOjUKVFJBTlNQOlRS
+QU5TUEFSRU5UClNFUVVFTkNFOjAKU1RBVFVTOkNPTkZJUk1FRApTVU1NQVJZ
+OklociBNaWV0d2FnZW4gdm9uIFNpeHQKVUlEOlNJWFRfOTg1MzQ3NDUxMwpC
+RUdJTjpWQUxBUk0KVFJJR0dFUjotUFQzME0KQUNUSU9OOkRJU1BMQVkKREVT
+Q1JJUFRJT046XG5EYXMgRmFocnpldWcgbWl0IGRlciBSZXNlcnZpZXJ1bmdz
+bnVtbWVyIDk4NTM0NzQ1MTMgc3RlaHQgYW0gMzEuMDcuMjAxNyB1bSAwOTow
+MCBVaHIgKE9ydHN6ZWl0KSBhbiBkZXIgU3RhdGlvbiBGcmFua2Z1cnQgYS4g
+TS4gVHJ1Y2sgMjRoIGbDvHIgU2llIGJlcmVpdC4gR2VidWNodGUgUsO8Y2tn
+YWJlOiBGcmFua2Z1cnQgYW0gTWFpbiBIYW5hdWVyIExhbmRzdHIuIDM0MCwg
+ZGVuIDMxLjA3LjIwMTcgdW0gMjM6MzAgVWhyXG5JbmZvcm1hdGlvbmVuIHp1
+ciBTdGF0aW9uLCBzb3dpZSBkaWUgTcO2Z2xpY2hrZWl0IHp1ciBVbWJ1Y2h1
+bmcgb2RlciBTdG9ybmllcnVuZyBmaW5kZW4gU2llIHVudGVyIGh0dHA6Ly93
+d3cuc2l4dC5kZVxuCkVORDpWQUxBUk0KRU5EOlZFVkVOVApFTkQ6VkNBTEVO
+REFSCg==
+
+--=_4eae6febab450ff78cf2e93518761c72--
