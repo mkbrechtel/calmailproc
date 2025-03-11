@@ -22,119 +22,119 @@ func TestProcessEmail(t *testing.T) {
 		// Test all mail files individually
 		{
 			name:           "Example mail 01 - Basic calendar invitation",
-			emailFile:      "../test/mails/example-mail-01.eml",
+			emailFile:      "../test/maildir/cur/example-mail-01.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 02 - Cancelled event",
-			emailFile:      "../test/mails/example-mail-02.eml",
+			emailFile:      "../test/maildir/cur/example-mail-02.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 03 - Calendar event",
-			emailFile:      "../test/mails/example-mail-03.eml",
+			emailFile:      "../test/maildir/cur/example-mail-03.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 04 - Calendar event",
-			emailFile:      "../test/mails/example-mail-04.eml",
+			emailFile:      "../test/maildir/cur/example-mail-04.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 05 - Original recurring event",
-			emailFile:      "../test/mails/example-mail-05.eml",
+			emailFile:      "../test/maildir/cur/example-mail-05.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 06 - Cancelled instance",
-			emailFile:      "../test/mails/example-mail-06.eml",
+			emailFile:      "../test/maildir/cur/example-mail-06.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 07 - Modified instance",
-			emailFile:      "../test/mails/example-mail-07.eml",
+			emailFile:      "../test/maildir/cur/example-mail-07.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 08 - No calendar data",
-			emailFile:      "../test/mails/example-mail-08.eml",
+			emailFile:      "../test/maildir/cur/example-mail-08.eml",
 			processReplies: true,
 			wantStoreCount: 0, // No calendar data to store
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 09 - No calendar data",
-			emailFile:      "../test/mails/example-mail-09.eml",
+			emailFile:      "../test/maildir/cur/example-mail-09.eml",
 			processReplies: true,
 			wantStoreCount: 0, // No calendar data to store
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 10 - No calendar data",
-			emailFile:      "../test/mails/example-mail-10.eml",
+			emailFile:      "../test/maildir/cur/example-mail-10.eml",
 			processReplies: true,
 			wantStoreCount: 0, // No calendar data to store
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 11 - No calendar data",
-			emailFile:      "../test/mails/example-mail-11.eml",
+			emailFile:      "../test/maildir/cur/example-mail-11.eml",
 			processReplies: true,
 			wantStoreCount: 0, // No calendar data to store
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 12 with replies=true - Reply",
-			emailFile:      "../test/mails/example-mail-12.eml",
+			emailFile:      "../test/maildir/cur/example-mail-12.eml",
 			processReplies: true,
 			wantStoreCount: 1, // Reply should be stored
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 12 with replies=false - Reply",
-			emailFile:      "../test/mails/example-mail-12.eml",
+			emailFile:      "../test/maildir/cur/example-mail-12.eml",
 			processReplies: false,
 			wantStoreCount: 0, // Reply should be ignored
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 13 - No calendar data",
-			emailFile:      "../test/mails/example-mail-13.eml",
+			emailFile:      "../test/maildir/cur/example-mail-13.eml",
 			processReplies: true,
 			wantStoreCount: 0, // No calendar data to store
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 14 - Reply with replies=true",
-			emailFile:      "../test/mails/example-mail-14.eml",
+			emailFile:      "../test/maildir/cur/example-mail-14.eml",
 			processReplies: true,
 			wantStoreCount: 1, // Reply should be stored
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 14 with replies=false - Reply",
-			emailFile:      "../test/mails/example-mail-14.eml",
+			emailFile:      "../test/maildir/cur/example-mail-14.eml",
 			processReplies: false,
 			wantStoreCount: 0, // Reply should be ignored
 			wantErr:        false,
 		},
 	}
 
-	for _, tt := range tests {
+	for _, tt := range testest/maildir/cur/
 		t.Run(tt.name, func(t *testing.T) {
 			// Reset the storage for each test
 			memStorage.Clear()
@@ -239,7 +239,7 @@ func TestProcessRepliesControl(t *testing.T) {
 	// Check that the reply was stored
 	withRepliesCount := memStorage.GetEventCount()
 	if withRepliesCount == 0 {
-		t.Errorf("Reply was not stored with process-replies=true")
+		t.Errorf("Reply was not storetest/maildir/cur/ess-replies=true")
 	}
 
 	// Test with process-replies=false
@@ -261,7 +261,7 @@ func TestProcessRepliesControl(t *testing.T) {
 	// Check that the reply was ignored
 	withoutRepliesCount := memStorage.GetEventCount()
 	if withoutRepliesCount > 0 {
-		t.Errorf("Reply was stored with process-replies=false")
+		t.Errorf("Reply was stored wtest/maildir/cur/-replies=false")
 	}
 }
 
@@ -288,7 +288,7 @@ func TestRecurringEventSequence(t *testing.T) {
 	count := memStorage.GetEventCount()
 	if count != 1 {
 		t.Errorf("Expected 1 event after original, got %d", count)
-	}
+	}test/maildir/cur/
 
 	// Step 2: Process the modification to a specific instance
 	modifiedFile, err := os.Open("../test/mails/example-mail-07.eml")
@@ -305,7 +305,7 @@ func TestRecurringEventSequence(t *testing.T) {
 	count = memStorage.GetEventCount()
 	if count != 1 {
 		t.Errorf("Expected 1 event after modification, got %d", count)
-	}
+	}test/maildir/cur/
 
 	// Retrieve the event and check it
 	events, err := memStorage.ListEvents()
@@ -335,7 +335,7 @@ func TestRecurringEventSequence(t *testing.T) {
 	count = memStorage.GetEventCount()
 	if count != 1 {
 		t.Errorf("Expected 1 event after cancellation, got %d", count)
-	}
+	}test/maildir/cur/
 
 	// Retrieve the event again to check cancellation was processed
 	events, err = memStorage.ListEvents()
