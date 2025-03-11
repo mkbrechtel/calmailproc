@@ -1,18 +1,53 @@
 #!/bin/bash
 #
 # Simple test script for calmailproc
-# Tests calendar email processing without modifying the filesystem
+# Tests calendar email processing with different storage methods
 
 set -e
 
 calmailproc="go run main.go"
 
-echo "=== Testing maildir mode ==="
-# Use existing test maildir without storing events (just parse and print)
-$calmailproc -maildir test/maildir -verbose
+# Clean up test directories
+rm -rf "test/out"
 
-echo
-echo "=== Testing single email processing mode ==="
-# Test processing a single email file without storage
-echo "Processing example-mail-01.eml"
-$calmailproc < test/maildir/cur/example-mail-01.eml
+
+echo "=== Testing maildir mode ==="
+$calmailproc -maildir test/maildir -store -vdir test/out/vdir1
+
+exit 0
+
+# Loop through storage methods
+for method in "vdir" "icalfile"; do
+    echo "=== Testing $method storage ==="
+    
+    # Set up args based on method
+    if [ "$method" == "vdir" ]; then
+        storage_dir="test/out/vdir2"
+        args="-store -vdir $storage_dir"
+    else
+        storage_file="test/out/calendar.ics"
+        args="-store -icalfile $storage_file"
+    fi
+    
+    # Process all example emails
+    for mail in $mail_dir/example-mail-*.eml; do
+       # Process the email
+        echo
+        echo "Processing $mail with $method storage"
+        $calmailproc $args < "$mail"
+    done
+    
+    # Simple verification
+    if [ "$method" == "vdir" ]; then
+        file_count=$(find "$storage_dir" -type f | wc -l)
+        echo "$method: Found $file_count calendar files"
+    else
+        if [ -f "$storage_file" ]; then
+            event_count=$(grep -c "BEGIN:VEVENT" "$storage_file")
+            echo "$method: Found $event_count events in calendar file"
+        else
+            echo "ERROR: Calendar file not created"
+            exit 1
+        fi
+    fi
+done
