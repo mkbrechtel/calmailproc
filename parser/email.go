@@ -8,6 +8,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/mail"
+	"os"
 	"strings"
 	"time"
 
@@ -71,7 +72,9 @@ func ParseEmail(r io.Reader) (*Email, error) {
 	if strings.HasPrefix(mediaType, "multipart/") {
 		boundary := params["boundary"]
 		if boundary == "" {
-			return email, fmt.Errorf("no boundary found for multipart message")
+			// Continue processing without multipart if boundary is missing
+			fmt.Fprintf(os.Stderr, "Warning: No boundary found for multipart message, continuing with basic text\n")
+			return email, nil
 		}
 
 		// Read the multipart body
@@ -82,7 +85,9 @@ func ParseEmail(r io.Reader) (*Email, error) {
 				break
 			}
 			if err != nil {
-				return email, fmt.Errorf("reading multipart: %w", err)
+				// Continue processing if one part fails
+				fmt.Fprintf(os.Stderr, "Warning: Error reading multipart: %v, continuing with parsed parts\n", err)
+				break
 			}
 
 			// Check for calendar part
@@ -90,7 +95,9 @@ func ParseEmail(r io.Reader) (*Email, error) {
 			if strings.Contains(partContentType, "text/calendar") {
 				email.HasCalendar = true
 				if err := extractCalendarData(part, email); err != nil {
-					return email, fmt.Errorf("extracting calendar data: %w", err)
+					// Continue without calendar data if extraction fails
+					fmt.Fprintf(os.Stderr, "Warning: Error extracting calendar data: %v, continuing without calendar\n", err)
+					email.HasCalendar = false
 				}
 			}
 		}
@@ -130,10 +137,32 @@ func extractCalendarData(part *multipart.Part, email *Email) error {
 }
 
 func extractBasicCalendarInfo(icsData []byte) (*CalendarEvent, error) {
-	// Use the go-ical package to parse just enough to get the UID
-	cal, err := ical.NewDecoder(bytes.NewReader(icsData)).Decode()
+	// Create a recovery event in case of panic
+	recoveryEvent := &CalendarEvent{
+		RawData: icsData,
+		UID:     "recovered-uid-" + time.Now().Format("20060102-150405"),
+		Summary: "Recovered Calendar Data",
+	}
+
+	// Use a defer-recover to handle any panics in the decoder
+	var cal *ical.Calendar
+	var err error
+	
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Panic in iCal decoder: %v, using recovery event\n", r)
+				err = fmt.Errorf("panic in decoder: %v", r)
+			}
+		}()
+		
+		cal, err = ical.NewDecoder(bytes.NewReader(icsData)).Decode()
+	}()
+	
 	if err != nil {
-		return nil, fmt.Errorf("parsing iCal: %w", err)
+		// Return a minimal event object with the raw data when parsing fails
+		fmt.Fprintf(os.Stderr, "Warning: Error parsing iCal data: %v, saving raw data only\n", err)
+		return recoveryEvent, nil
 	}
 
 	// Store the raw data
@@ -157,16 +186,25 @@ func extractBasicCalendarInfo(icsData []byte) (*CalendarEvent, error) {
 		uidProp := component.Props.Get("UID")
 		if uidProp != nil {
 			event.UID = uidProp.Value
+		} else {
+			// Generate a fallback UID if none found
+			event.UID = "generated-uid-" + time.Now().Format("20060102-150405")
 		}
 
 		// Extract Summary (optional)
 		summaryProp := component.Props.Get("SUMMARY")
 		if summaryProp != nil {
 			event.Summary = summaryProp.Value
+		} else {
+			event.Summary = "Event without summary"
 		}
 
 		return event, nil
 	}
 
-	return nil, fmt.Errorf("no VEVENT component found in iCalendar data")
+	// If no VEVENT found, create a minimal event
+	event.UID = "no-vevent-" + time.Now().Format("20060102-150405")
+	event.Summary = "Calendar data without VEVENT"
+	
+	return event, nil
 }

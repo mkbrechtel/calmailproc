@@ -42,8 +42,21 @@ func (s *VDirStorage) StoreEvent(event *parser.CalendarEvent) error {
 	filename := fmt.Sprintf("%s.ics", event.UID)
 	filePath := filepath.Join(s.BasePath, filename)
 
-	// Parse the iCalendar data
-	cal, err := ical.NewDecoder(bytes.NewReader(event.RawData)).Decode()
+	// Parse the iCalendar data using panic recovery
+	var cal *ical.Calendar
+	var err error
+	
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Panic in VDirStorage iCal decoder: %v, storing raw data only\n", r)
+				err = fmt.Errorf("panic in decoder: %v", r)
+			}
+		}()
+		
+		cal, err = ical.NewDecoder(bytes.NewReader(event.RawData)).Decode()
+	}()
+	
 	if err != nil {
 		// If we can't parse it, just store the raw data as before
 		if err := os.WriteFile(filePath, event.RawData, 0644); err != nil {
@@ -70,7 +83,19 @@ func (s *VDirStorage) StoreEvent(event *parser.CalendarEvent) error {
 	}
 
 	// File exists, check if we need to merge this event with existing data
-	existingCal, err := ical.NewDecoder(bytes.NewReader(existingData)).Decode()
+	var existingCal *ical.Calendar
+	
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Panic in VDirStorage existing iCal decoder: %v, overwriting with new data\n", r)
+				err = fmt.Errorf("panic in decoder: %v", r)
+			}
+		}()
+		
+		existingCal, err = ical.NewDecoder(bytes.NewReader(existingData)).Decode()
+	}()
+	
 	if err != nil {
 		// Can't parse existing, overwrite with new data
 		if err := os.WriteFile(filePath, event.RawData, 0644); err != nil {
@@ -184,8 +209,23 @@ func (s *VDirStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 	}
 
 	// Extract minimal information for display purposes
-	cal, err := ical.NewDecoder(bytes.NewReader(data)).Decode()
-	if err == nil { // Ignore parsing errors, we already have the raw data
+	var cal *ical.Calendar
+	var parseErr error
+	
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				fmt.Fprintf(os.Stderr, "Warning: Panic in GetEvent iCal decoder: %v, returning basic event\n", r)
+				parseErr = fmt.Errorf("panic in decoder: %v", r)
+				// Set default summary for events that can't be parsed
+				event.Summary = "Unparseable Calendar Event"
+			}
+		}()
+		
+		cal, parseErr = ical.NewDecoder(bytes.NewReader(data)).Decode()
+	}()
+	
+	if parseErr == nil { // Ignore parsing errors, we already have the raw data
 		for _, component := range cal.Children {
 			if component.Name != "VEVENT" {
 				continue

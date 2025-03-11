@@ -118,12 +118,10 @@ func processSubfolders(parentDir string, proc *processor.Processor, jsonOutput, 
 		}
 
 		// Process the email
-		fmt.Fprintf(os.Stderr, "Processing %s\n", filePath)
+		fmt.Fprintf(os.Stderr, "Processing email: %s\n", filePath)
 		if err := proc.ProcessEmail(f, jsonOutput, storeEvent); err != nil {
 			f.Close()
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
-			}
+			fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
 			continue
 		}
 
@@ -225,18 +223,11 @@ func processMaildirSubdir(dir string, proc *processor.Processor, jsonOutput, sto
 		}
 
 		// Process the email
-		if verbose {
-			fmt.Fprintf(os.Stderr, "Processing %s\n", filePath)
-		} else {
-			// Always show minimal progress indicator
-			fmt.Fprintf(os.Stderr, ".")
-		}
+		fmt.Fprintf(os.Stderr, "Processing email: %s\n", filePath)
 
 		if err := proc.ProcessEmail(f, jsonOutput, storeEvent); err != nil {
 			f.Close()
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
-			}
+			fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
 			continue
 		}
 
