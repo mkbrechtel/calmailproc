@@ -134,7 +134,7 @@ The processor module is divided into specialized sub-modules for each operation 
 
 3. **Immutable data flow**:
    - Email parser should produce email data without interpretation
-   - iCalendar parser should extract calendar data without validation
+   - iCalendar parser should extract calendar data without modifying it
    - Processor should make decisions but not modify raw data
    - Storage should handle all format-specific transformations
 
@@ -151,7 +151,7 @@ To further improve the project architecture:
 1. **Parser modules refinement**:
    - ✅ Split parsing into email and calendar components - DONE
    - ✅ Create a clean extraction layer that doesn't attempt calendar validation - DONE
-   - Keep extracted data minimal - only ID, sequence, and method are needed for decisions
+   - ✅ Keep extracted data minimal - only ID, sequence, and method are needed for decisions
    - ✅ Preserve raw bytes for storage layer - DONE
 
 2. **Storage layer refinement**:
@@ -164,6 +164,10 @@ To further improve the project architecture:
    - Implement clear decision trees with minimal branching
    - Move format-specific logic to appropriate layers
    - Make business rules explicit and configurable
+
+4. **Attendee updates module**:
+   - Implement attendee update logic in separate module
+   - Don't do the attendee update logic in the storage module but in the processor module
 
 ## Calendar Event Handling
 
