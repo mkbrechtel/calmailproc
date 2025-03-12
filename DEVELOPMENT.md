@@ -5,25 +5,40 @@ calmailproc is a Go application that processes emails containing calendar data (
 
 ## Core Components and Responsibilities
 
-### 1. Parser Module (`/parser`)
-**Primary responsibility**: Extract calendar events from emails without making assumptions or modifications to the data.
+### 1. Parser Modules 
+
+The parser functionality is split into two modules with distinct responsibilities:
+
+#### 1.1 Email Parser (`/parser/email`)
+**Primary responsibility**: Parse email content without calendar-specific interpretation.
 
 - **Input**: Raw email content (RFC822 format)
-- **Output**: Email metadata + calendar event data as found in the email
+- **Output**: Email metadata with calendar event data if present
 - **Constraints**:
-  - Must not interpret or validate calendar semantics - extract only
-  - Must preserve original calendar data for storage modules
+  - Must extract email fields (subject, from, to, date)
+  - Must detect presence of calendar attachments
   - Must handle common email encodings (base64, quoted-printable)
-  - May extract metadata for identification (UID, summary, sequence number)
+  - Must delegate calendar parsing to the ical module
+
+#### 1.2 iCalendar Parser (`/parser/ical`)
+**Primary responsibility**: Parse and provide access to calendar data.
+
+- **Input**: Raw iCalendar data (from email attachments)
+- **Output**: Structured calendar event data
+- **Constraints**:
+  - Must extract essential calendar fields (UID, summary, sequence number)
+  - Must preserve original calendar data for storage modules
+  - Must centralize all iCalendar parsing functionality
+  - May extract additional metadata for identification
 
 ### 2. Storage Module (`/storage`)
 
 **Primary responsibility**: Provide a consistent interface for storing and retrieving calendar events.
 
 - **Interface**:
-  - `StoreEvent(event *parser.CalendarEvent) error`
-  - `GetEvent(id string) (*parser.CalendarEvent, error)`
-  - `ListEvents() ([]*parser.CalendarEvent, error)`
+  - `StoreEvent(event *ical.Event) error`
+  - `GetEvent(id string) (*ical.Event, error)`
+  - `ListEvents() ([]*ical.Event, error)`
   - `DeleteEvent(id string) error`
 
 - **Key implementations**:
@@ -97,15 +112,17 @@ The processor module is divided into specialized sub-modules for each operation 
 ## Data Flow
 
 1. Email is read from stdin or maildir
-2. Parser extracts calendar data without modification
-3. Processor applies business logic
-4. Storage saves the event according to its implementation rules
-5. Output is presented to the user
+2. Email parser extracts basic email data and identifies calendar attachments
+3. iCalendar parser extracts calendar event data when present
+4. Processor applies business logic to the parsed data
+5. Storage saves the event according to its implementation rules
+6. Output is presented to the user
 
 ## Key Design Principles
 
 1. **Clear separation of concerns**:
-   - Parser: Extract data only, don't interpret
+   - Email Parser: Extract email data only
+   - iCalendar Parser: Parse calendar data only
    - Storage: Store/retrieve data, maintain data integrity
    - Processor: Apply business logic, make decisions
 
@@ -116,7 +133,8 @@ The processor module is divided into specialized sub-modules for each operation 
    - Fail gracefully where possible
 
 3. **Immutable data flow**:
-   - Parser should produce data without modification
+   - Email parser should produce email data without interpretation
+   - iCalendar parser should extract calendar data without validation
    - Processor should make decisions but not modify raw data
    - Storage should handle all format-specific transformations
 
@@ -128,15 +146,17 @@ The processor module is divided into specialized sub-modules for each operation 
 
 ## Improvement Recommendations
 
-To rebuild the project with a cleaner architecture:
+To further improve the project architecture:
 
-1. **Parser module refactoring**:
-   - Create a clean extraction layer that doesn't attempt calendar validation
+1. **Parser modules refinement**:
+   - ✅ Split parsing into email and calendar components - DONE
+   - ✅ Create a clean extraction layer that doesn't attempt calendar validation - DONE
    - Keep extracted data minimal - only ID, sequence, and method are needed for decisions
-   - Preserve raw bytes for storage layer
+   - ✅ Preserve raw bytes for storage layer - DONE
 
 2. **Storage layer refinement**:
-   - Move all iCalendar-specific logic into storage implementations
+   - ✅ Use the ical.Event type consistently across all storage implementations - DONE
+   - ✅ Use the parser/ical module for all calendar operations - DONE
    - Implement proper atomicity for file operations
    - Add validation of stored output
 
@@ -152,19 +172,22 @@ The application handles various types of calendar events according to the iCalen
 ### Event Types and Methods
 
 1. **REQUEST (New Event or Update)**
-   - Parser: Extract UID, sequence number, and raw data
+   - Email Parser: Detect email with calendar attachment
+   - iCal Parser: Extract UID, sequence number, and raw data
    - Processor: Check for existing event with same UID
    - Storage: Store as new event if UID not found
    - Storage: Update existing event if sequence number is higher
 
 2. **CANCEL (Event Cancellation)**
-   - Parser: Extract UID, sequence number, and raw data
+   - Email Parser: Detect email with calendar attachment
+   - iCal Parser: Extract UID, sequence number, and method (CANCEL)
    - Processor: Check for existing event with same UID
    - Storage: Update event status to CANCELLED
    - Storage: Do not overwrite if existing sequence number is higher
 
 3. **REPLY (Attendance Response)**
-   - Parser: Extract UID, method, and raw data
+   - Email Parser: Detect email with calendar attachment
+   - iCal Parser: Extract UID, method (REPLY), and raw data
    - Processor: Check if reply processing is enabled
    - Processor: If enabled, pass to storage; otherwise, ignore
    - Storage: Update participant status in existing event
@@ -205,7 +228,8 @@ Sequence numbers prevent out-of-order processing:
 ## Testing Strategy
 
 1. **Unit tests**:
-   - Parser: Test extraction from various email formats
+   - Email Parser: Test extraction from various email formats
+   - iCal Parser: Test calendar data extraction and handling
    - Storage: Test CRUD operations on calendar data
    - Processor: Test business logic and decision making
 
