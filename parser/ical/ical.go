@@ -8,7 +8,6 @@ import (
 	"mime/multipart"
 	"os"
 	"strings"
-	"time"
 
 	goical "github.com/emersion/go-ical"
 )
@@ -45,13 +44,6 @@ func ParseCalendarData(part *multipart.Part) (*Event, error) {
 
 // ParseICalData parses iCalendar data and extracts basic event information
 func ParseICalData(icsData []byte) (*Event, error) {
-	// Create a recovery event in case of panic
-	recoveryEvent := &Event{
-		RawData: icsData,
-		UID:     "recovered-uid-" + time.Now().Format("20060102-150405"),
-		Summary: "Recovered Calendar Data",
-	}
-
 	// Use a defer-recover to handle any panics in the decoder
 	var cal *goical.Calendar
 	var err error
@@ -59,7 +51,7 @@ func ParseICalData(icsData []byte) (*Event, error) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "Warning: Panic in iCal decoder: %v, using recovery event\n", r)
+				fmt.Fprintf(os.Stderr, "Warning: Panic in iCal decoder: %v\n", r)
 				err = fmt.Errorf("panic in decoder: %v", r)
 			}
 		}()
@@ -68,9 +60,7 @@ func ParseICalData(icsData []byte) (*Event, error) {
 	}()
 	
 	if err != nil {
-		// Return a minimal event object with the raw data when parsing fails
-		fmt.Fprintf(os.Stderr, "Warning: Error parsing iCal data: %v, saving raw data only\n", err)
-		return recoveryEvent, nil
+		return nil, fmt.Errorf("parsing iCal data: %w", err)
 	}
 
 	// Store the raw data
@@ -90,13 +80,13 @@ func ParseICalData(icsData []byte) (*Event, error) {
 			continue
 		}
 
-		// Extract UID
+		// Extract UID - required by iCalendar standard
 		uidProp := component.Props.Get("UID")
 		if uidProp != nil {
 			event.UID = uidProp.Value
 		} else {
-			// Generate a fallback UID if none found
-			event.UID = "generated-uid-" + time.Now().Format("20060102-150405")
+			// No UID found - this violates the iCalendar standard
+			return nil, fmt.Errorf("VEVENT missing required UID property")
 		}
 
 		// Extract Summary (optional)
@@ -120,11 +110,8 @@ func ParseICalData(icsData []byte) (*Event, error) {
 		return event, nil
 	}
 
-	// If no VEVENT found, create a minimal event
-	event.UID = "no-vevent-" + time.Now().Format("20060102-150405")
-	event.Summary = "Calendar data without VEVENT"
-	
-	return event, nil
+	// If no VEVENT found, return an error
+	return nil, fmt.Errorf("no VEVENT component found in iCalendar data")
 }
 
 // DecodeCalendar parses iCalendar data into a Calendar object
@@ -178,3 +165,4 @@ type Component = goical.Component
 
 // Prop is the exported type for go-ical.Prop
 type Prop = goical.Prop
+

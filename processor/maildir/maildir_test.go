@@ -2,7 +2,6 @@ package maildir
 
 import (
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/mkbrechtel/calmailproc/processor"
@@ -65,25 +64,20 @@ func TestProcess_MalformedEmails(t *testing.T) {
 		t.Errorf("Expected no error processing maildir with malformed emails, but got: %v", err)
 	}
 	
-	// Look for recovered UIDs in the events
-	var foundRecoveredEvent bool
+	// We no longer expect to have recovered events with generated UIDs
+	// Instead, example-mail-15.eml should be correctly identified as unparseable
+	// and should not appear in the stored events at all
+	
+	// Count events to ensure we're not storing invalid calendar data
 	events, err := store.ListEvents()
 	if err != nil {
 		t.Errorf("Error listing events: %v", err)
 	}
+	
+	// Verify that all stored events have valid non-empty UIDs
 	for _, event := range events {
 		if event.UID == "" {
-			t.Errorf("Found event with empty UID, which shouldn't happen with recovery logic")
+			t.Errorf("Found event with empty UID in storage, which should never happen")
 		}
-		
-		// Check if this is a recovered event by looking at the UID pattern
-		if len(event.UID) >= 12 && strings.HasPrefix(event.UID, "recovered-uid") {
-			foundRecoveredEvent = true
-		}
-	}
-	
-	// Expect to find at least one recovered event (from example-mail-15.eml)
-	if !foundRecoveredEvent {
-		t.Errorf("Expected to find recovered calendar event, but none found")
 	}
 }
