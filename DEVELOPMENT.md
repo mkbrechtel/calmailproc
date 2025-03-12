@@ -27,9 +27,9 @@ calmailproc is a Go application that processes emails containing calendar data (
   - `DeleteEvent(id string) error`
 
 - **Key implementations**:
-  - **Memory storage**: In-memory implementation for testing
-  - **vdir storage**: File-based implementation using vdir format
-  - **icalfile storage**: Single-file calendar implementation
+  - **Memory storage** (`'/storage/memory` module): In-memory implementation for testing
+  - **vdir storage** (`'/storage/vdir` module): File-based implementation using vdir format
+  - **icalfile storage** (`'/storage/icalfile` module): Single-file calendar implementation
 
 - **Constraints**:
   - Must handle iCalendar format correctly without corrupting data
@@ -51,6 +51,38 @@ calmailproc is a Go application that processes emails containing calendar data (
   - Should not directly parse or modify calendar data
   - Should validate basic requirements before storage
   - Should handle errors gracefully
+
+### Processor Sub-modules
+
+The processor module is divided into specialized sub-modules for each operation mode:
+
+#### 3.1 Shared Processor functionality (`/processor`)
+
+**Primary responsibility**: Handle general event processing logic common to all modes.
+
+- **Core functions**:
+  - Implement sequence number checking
+  - Apply METHOD handling rules
+  - Provide decision framework for event storage
+
+#### 3.2 Stdin Processor (`/processor/stdin`)
+
+**Primary responsibility**: Process single emails from stdin with immediate feedback.
+
+- **Core functions**:
+  - Stream processing with minimal memory usage
+  - Immediate output formatting
+  - Return appropriate exit codes for pipeline integration
+
+#### 3.3 Maildir Processor (`/processor/maildir`)
+
+**Primary responsibility**: Batch process multiple emails from maildir structure.
+
+- **Core functions**:
+  - Efficiently iterate through maildir hierarchies
+  - Track processed emails to avoid duplicates
+  - Generate batch summary statistics
+  - Handle directory locking and file status transitions
 
 ### 4. Main Application
 
