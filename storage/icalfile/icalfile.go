@@ -1,13 +1,11 @@
 package icalfile
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"sync"
 
-	"github.com/emersion/go-ical"
-	"github.com/mkbrechtel/calmailproc/parser"
+	"github.com/mkbrechtel/calmailproc/parser/ical"
 )
 
 // ICalFileStorage implements the storage.Storage interface using a single iCalendar file
@@ -25,7 +23,11 @@ func NewICalFileStorage(filePath string) (*ICalFileStorage, error) {
 	// Create an empty calendar file if it doesn't exist
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		// Create a minimal valid iCalendar file
-		initialContent := []byte("BEGIN:VCALENDAR\r\nPRODID:-//calmailproc//ICalFileStorage//EN\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n")
+		cal := ical.NewCalendar()
+		initialContent, err := ical.EncodeCalendar(cal)
+		if err != nil {
+			return nil, fmt.Errorf("creating initial calendar content: %w", err)
+		}
 		if err := os.WriteFile(filePath, initialContent, 0644); err != nil {
 			return nil, fmt.Errorf("creating initial calendar file: %w", err)
 		}
@@ -35,7 +37,7 @@ func NewICalFileStorage(filePath string) (*ICalFileStorage, error) {
 }
 
 // StoreEvent stores a calendar event in the single iCalendar file
-func (s *ICalFileStorage) StoreEvent(event *parser.CalendarEvent) error {
+func (s *ICalFileStorage) StoreEvent(event *ical.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -54,16 +56,14 @@ func (s *ICalFileStorage) StoreEvent(event *parser.CalendarEvent) error {
 	}
 
 	// Parse the existing calendar
-	existingCal, err := ical.NewDecoder(bytes.NewReader(existingData)).Decode()
+	existingCal, err := ical.DecodeCalendar(existingData)
 	if err != nil {
 		// If we can't parse it, create a new calendar
 		existingCal = ical.NewCalendar()
-		existingCal.Props.Set(&ical.Prop{Name: "PRODID", Value: "-//calmailproc//ICalFileStorage//EN"})
-		existingCal.Props.Set(&ical.Prop{Name: "VERSION", Value: "2.0"})
 	}
 
 	// Parse the new event data
-	newCal, err := ical.NewDecoder(bytes.NewReader(event.RawData)).Decode()
+	newCal, err := ical.DecodeCalendar(event.RawData)
 	if err != nil {
 		return fmt.Errorf("parsing new event data: %w", err)
 	}
@@ -126,13 +126,12 @@ func (s *ICalFileStorage) StoreEvent(event *parser.CalendarEvent) error {
 	}
 
 	// Write the updated calendar back to the file
-	var buf bytes.Buffer
-	encoder := ical.NewEncoder(&buf)
-	if err := encoder.Encode(existingCal); err != nil {
+	calBytes, err := ical.EncodeCalendar(existingCal)
+	if err != nil {
 		return fmt.Errorf("encoding updated calendar: %w", err)
 	}
 
-	if err := os.WriteFile(s.FilePath, buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(s.FilePath, calBytes, 0644); err != nil {
 		return fmt.Errorf("writing updated calendar file: %w", err)
 	}
 
@@ -140,7 +139,7 @@ func (s *ICalFileStorage) StoreEvent(event *parser.CalendarEvent) error {
 }
 
 // GetEvent retrieves a calendar event from the iCalendar file by UID
-func (s *ICalFileStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
+func (s *ICalFileStorage) GetEvent(id string) (*ical.Event, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -151,7 +150,7 @@ func (s *ICalFileStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 	}
 
 	// Parse the calendar
-	cal, err := ical.NewDecoder(bytes.NewReader(data)).Decode()
+	cal, err := ical.DecodeCalendar(data)
 	if err != nil {
 		return nil, fmt.Errorf("parsing calendar data: %w", err)
 	}
@@ -168,7 +167,6 @@ func (s *ICalFileStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 		}
 
 		// We found the event, extract its data
-		var eventBuf bytes.Buffer
 		eventCal := ical.NewCalendar()
 
 		// Copy the relevant properties from the main calendar
@@ -193,15 +191,15 @@ func (s *ICalFileStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 		}
 
 		// Encode the event calendar
-		encoder := ical.NewEncoder(&eventBuf)
-		if err := encoder.Encode(eventCal); err != nil {
+		eventBytes, err := ical.EncodeCalendar(eventCal)
+		if err != nil {
 			return nil, fmt.Errorf("encoding event data: %w", err)
 		}
 
 		// Create the event object
-		event := &parser.CalendarEvent{
+		event := &ical.Event{
 			UID:     id,
-			RawData: eventBuf.Bytes(),
+			RawData: eventBytes,
 		}
 
 		// Extract summary if available
@@ -217,7 +215,7 @@ func (s *ICalFileStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 }
 
 // ListEvents lists all events in the iCalendar file
-func (s *ICalFileStorage) ListEvents() ([]*parser.CalendarEvent, error) {
+func (s *ICalFileStorage) ListEvents() ([]*ical.Event, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -228,13 +226,13 @@ func (s *ICalFileStorage) ListEvents() ([]*parser.CalendarEvent, error) {
 	}
 
 	// Parse the calendar
-	cal, err := ical.NewDecoder(bytes.NewReader(data)).Decode()
+	cal, err := ical.DecodeCalendar(data)
 	if err != nil {
 		return nil, fmt.Errorf("parsing calendar data: %w", err)
 	}
 
 	// Create a map to store unique events by UID
-	eventMap := make(map[string]*parser.CalendarEvent)
+	eventMap := make(map[string]*ical.Event)
 
 	// Process all VEVENT components
 	for _, component := range cal.Children {
@@ -252,7 +250,7 @@ func (s *ICalFileStorage) ListEvents() ([]*parser.CalendarEvent, error) {
 		// Check if we already have an event with this UID
 		if _, exists := eventMap[uid]; !exists {
 			// Create a new event for this UID
-			event := &parser.CalendarEvent{
+			event := &ical.Event{
 				UID: uid,
 			}
 
@@ -267,7 +265,7 @@ func (s *ICalFileStorage) ListEvents() ([]*parser.CalendarEvent, error) {
 	}
 
 	// Convert the map values to a slice
-	var events []*parser.CalendarEvent
+	var events []*ical.Event
 	for _, event := range eventMap {
 		events = append(events, event)
 	}
@@ -287,7 +285,7 @@ func (s *ICalFileStorage) DeleteEvent(id string) error {
 	}
 
 	// Parse the calendar
-	cal, err := ical.NewDecoder(bytes.NewReader(data)).Decode()
+	cal, err := ical.DecodeCalendar(data)
 	if err != nil {
 		return fmt.Errorf("parsing calendar data: %w", err)
 	}
@@ -315,13 +313,12 @@ func (s *ICalFileStorage) DeleteEvent(id string) error {
 	cal.Children = newChildren
 
 	// Write the updated calendar back to the file
-	var buf bytes.Buffer
-	encoder := ical.NewEncoder(&buf)
-	if err := encoder.Encode(cal); err != nil {
+	calBytes, err := ical.EncodeCalendar(cal)
+	if err != nil {
 		return fmt.Errorf("encoding updated calendar: %w", err)
 	}
 
-	if err := os.WriteFile(s.FilePath, buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(s.FilePath, calBytes, 0644); err != nil {
 		return fmt.Errorf("writing updated calendar file: %w", err)
 	}
 

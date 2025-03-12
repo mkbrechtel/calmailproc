@@ -1,4 +1,4 @@
-package parser
+package email
 
 import (
 	"os"
@@ -7,14 +7,14 @@ import (
 
 func TestParseEmail(t *testing.T) {
 	// Open the test email file
-	file, err := os.Open("../test/maildir/cur/example-mail-01.eml")
+	file, err := os.Open("../../test/maildir/cur/example-mail-01.eml")
 	if err != nil {
 		t.Fatalf("Failed to open test email: %v", err)
 	}
 	defer file.Close()
 
 	// Parse the email
-	email, err := ParseEmail(file)
+	email, err := Parse(file)
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}

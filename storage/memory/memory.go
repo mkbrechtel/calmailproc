@@ -1,30 +1,28 @@
 package memory
 
 import (
-	"bytes"
 	"fmt"
 	"sync"
 
-	"github.com/emersion/go-ical"
-	"github.com/mkbrechtel/calmailproc/parser"
+	"github.com/mkbrechtel/calmailproc/parser/ical"
 )
 
 // MemoryStorage implements the storage.Storage interface using an in-memory map
 // Primarily intended for testing
 type MemoryStorage struct {
-	events map[string]*parser.CalendarEvent
+	events map[string]*ical.Event
 	mu     sync.RWMutex
 }
 
 // NewMemoryStorage creates a new in-memory storage
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
-		events: make(map[string]*parser.CalendarEvent),
+		events: make(map[string]*ical.Event),
 	}
 }
 
 // StoreEvent stores a calendar event in memory
-func (s *MemoryStorage) StoreEvent(event *parser.CalendarEvent) error {
+func (s *MemoryStorage) StoreEvent(event *ical.Event) error {
 	if event.UID == "" {
 		return fmt.Errorf("event has no UID")
 	}
@@ -41,7 +39,7 @@ func (s *MemoryStorage) StoreEvent(event *parser.CalendarEvent) error {
 	if !exists {
 		// New event, just store it
 		// Make a copy to avoid potential references issues
-		eventCopy := &parser.CalendarEvent{
+		eventCopy := &ical.Event{
 			UID:         event.UID,
 			RawData:     make([]byte, len(event.RawData)),
 			Summary:     event.Summary,
@@ -58,7 +56,7 @@ func (s *MemoryStorage) StoreEvent(event *parser.CalendarEvent) error {
 	}
 
 	// Parse the existing event data
-	existingCal, err := ical.NewDecoder(bytes.NewReader(existingEvent.RawData)).Decode()
+	existingCal, err := ical.DecodeCalendar(existingEvent.RawData)
 	if err != nil {
 		// Can't parse existing, overwrite with new data
 		s.events[event.UID] = event
@@ -66,7 +64,7 @@ func (s *MemoryStorage) StoreEvent(event *parser.CalendarEvent) error {
 	}
 
 	// Parse the new event data
-	newCal, err := ical.NewDecoder(bytes.NewReader(event.RawData)).Decode()
+	newCal, err := ical.DecodeCalendar(event.RawData)
 	if err != nil {
 		// Can't parse new data, keep existing
 		return fmt.Errorf("parsing new event data: %w", err)
@@ -149,19 +147,18 @@ func (s *MemoryStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, n
 	}
 
 	// Encode the updated calendar back to bytes
-	var buf bytes.Buffer
-	encoder := ical.NewEncoder(&buf)
-	if err := encoder.Encode(existingCal); err != nil {
+	calBytes, err := ical.EncodeCalendar(existingCal)
+	if err != nil {
 		return fmt.Errorf("encoding updated calendar: %w", err)
 	}
 
 	// Update the event in memory
-	s.events[uid].RawData = buf.Bytes()
+	s.events[uid].RawData = calBytes
 	return nil
 }
 
 // GetEvent retrieves a calendar event from memory
-func (s *MemoryStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
+func (s *MemoryStorage) GetEvent(id string) (*ical.Event, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -171,7 +168,7 @@ func (s *MemoryStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 	}
 
 	// Return a copy to prevent modification of internal state
-	eventCopy := &parser.CalendarEvent{
+	eventCopy := &ical.Event{
 		UID:         event.UID,
 		RawData:     make([]byte, len(event.RawData)),
 		Summary:     event.Summary,
@@ -188,14 +185,14 @@ func (s *MemoryStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 }
 
 // ListEvents lists all events in memory
-func (s *MemoryStorage) ListEvents() ([]*parser.CalendarEvent, error) {
+func (s *MemoryStorage) ListEvents() ([]*ical.Event, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	events := make([]*parser.CalendarEvent, 0, len(s.events))
+	events := make([]*ical.Event, 0, len(s.events))
 	for _, event := range s.events {
 		// Create a copy of each event
-		eventCopy := &parser.CalendarEvent{
+		eventCopy := &ical.Event{
 			UID:         event.UID,
 			RawData:     make([]byte, len(event.RawData)),
 			Summary:     event.Summary,
@@ -237,5 +234,5 @@ func (s *MemoryStorage) GetEventCount() int {
 func (s *MemoryStorage) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.events = make(map[string]*parser.CalendarEvent)
+	s.events = make(map[string]*ical.Event)
 }

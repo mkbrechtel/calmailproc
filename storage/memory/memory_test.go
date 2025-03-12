@@ -4,15 +4,14 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/emersion/go-ical"
-	"github.com/mkbrechtel/calmailproc/parser"
+	"github.com/mkbrechtel/calmailproc/parser/ical"
 )
 
 func TestMemoryStorage_Basic(t *testing.T) {
 	storage := NewMemoryStorage()
 
 	// Create a test event
-	event := &parser.CalendarEvent{
+	event := &ical.Event{
 		UID:     "test-event-1",
 		Summary: "Test Event",
 		RawData: []byte("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Example//Calendar//EN\r\nBEGIN:VEVENT\r\nUID:test-event-1\r\nSUMMARY:Test Event\r\nEND:VEVENT\r\nEND:VCALENDAR"),
@@ -88,7 +87,7 @@ RRULE:FREQ=WEEKLY;COUNT=4
 END:VEVENT
 END:VCALENDAR`)
 
-	masterEvent := &parser.CalendarEvent{
+	masterEvent := &ical.Event{
 		UID:     "recurring-event-1",
 		Summary: "Recurring Meeting",
 		RawData: masterEventData,
@@ -114,7 +113,7 @@ RECURRENCE-ID:20250308T090000Z
 END:VEVENT
 END:VCALENDAR`)
 
-	updateEvent := &parser.CalendarEvent{
+	updateEvent := &ical.Event{
 		UID:     "recurring-event-1",
 		Summary: "Updated Recurring Meeting",
 		Method:  "REQUEST",
@@ -133,7 +132,7 @@ END:VCALENDAR`)
 	}
 
 	// Parse the raw data to verify it contains both the master and the exception
-	cal, err := ical.NewDecoder(bytes.NewReader(retrievedEvent.RawData)).Decode()
+	cal, err := ical.DecodeCalendar(retrievedEvent.RawData)
 	if err != nil {
 		t.Fatalf("Failed to parse retrieved event: %v", err)
 	}
@@ -186,7 +185,7 @@ RRULE:FREQ=WEEKLY;COUNT=4
 END:VEVENT
 END:VCALENDAR`)
 
-	masterEvent := &parser.CalendarEvent{
+	masterEvent := &ical.Event{
 		UID:     "recurring-event-2",
 		Summary: "Recurring Meeting",
 		RawData: masterEventData,
@@ -213,7 +212,7 @@ STATUS:CANCELLED
 END:VEVENT
 END:VCALENDAR`)
 
-	cancelEvent := &parser.CalendarEvent{
+	cancelEvent := &ical.Event{
 		UID:     "recurring-event-2",
 		Summary: "Recurring Meeting",
 		Method:  "CANCEL",
@@ -232,7 +231,7 @@ END:VCALENDAR`)
 	}
 
 	// Parse the raw data to verify it contains both the master and the cancellation
-	cal, err := ical.NewDecoder(bytes.NewReader(retrievedEvent.RawData)).Decode()
+	cal, err := ical.DecodeCalendar(retrievedEvent.RawData)
 	if err != nil {
 		t.Fatalf("Failed to parse retrieved event: %v", err)
 	}

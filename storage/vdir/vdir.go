@@ -1,14 +1,12 @@
 package vdir
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/emersion/go-ical"
-	"github.com/mkbrechtel/calmailproc/parser"
+	"github.com/mkbrechtel/calmailproc/parser/ical"
 )
 
 // VDirStorage implements the storage.Storage interface using the vdir format
@@ -29,7 +27,7 @@ func NewVDirStorage(basePath string) (*VDirStorage, error) {
 }
 
 // StoreEvent stores a calendar event in the vdir format
-func (s *VDirStorage) StoreEvent(event *parser.CalendarEvent) error {
+func (s *VDirStorage) StoreEvent(event *ical.Event) error {
 	if event.UID == "" {
 		return fmt.Errorf("event has no UID")
 	}
@@ -43,19 +41,7 @@ func (s *VDirStorage) StoreEvent(event *parser.CalendarEvent) error {
 	filePath := filepath.Join(s.BasePath, filename)
 
 	// Parse the iCalendar data using panic recovery
-	var cal *ical.Calendar
-	var err error
-	
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "Warning: Panic in VDirStorage iCal decoder: %v, storing raw data only\n", r)
-				err = fmt.Errorf("panic in decoder: %v", r)
-			}
-		}()
-		
-		cal, err = ical.NewDecoder(bytes.NewReader(event.RawData)).Decode()
-	}()
+	cal, err := ical.DecodeCalendar(event.RawData)
 	
 	if err != nil {
 		// If we can't parse it, just store the raw data as before
@@ -83,18 +69,7 @@ func (s *VDirStorage) StoreEvent(event *parser.CalendarEvent) error {
 	}
 
 	// File exists, check if we need to merge this event with existing data
-	var existingCal *ical.Calendar
-	
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "Warning: Panic in VDirStorage existing iCal decoder: %v, overwriting with new data\n", r)
-				err = fmt.Errorf("panic in decoder: %v", r)
-			}
-		}()
-		
-		existingCal, err = ical.NewDecoder(bytes.NewReader(existingData)).Decode()
-	}()
+	existingCal, err := ical.DecodeCalendar(existingData)
 	
 	if err != nil {
 		// Can't parse existing, overwrite with new data
@@ -177,13 +152,12 @@ func (s *VDirStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, new
 	}
 
 	// Write the updated calendar back to the file
-	var buf bytes.Buffer
-	encoder := ical.NewEncoder(&buf)
-	if err := encoder.Encode(existingCal); err != nil {
+	calBytes, err := ical.EncodeCalendar(existingCal)
+	if err != nil {
 		return fmt.Errorf("encoding updated calendar: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(filePath, calBytes, 0644); err != nil {
 		return fmt.Errorf("writing updated calendar file: %w", err)
 	}
 
@@ -191,7 +165,7 @@ func (s *VDirStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, new
 }
 
 // GetEvent retrieves a calendar event from the vdir storage
-func (s *VDirStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
+func (s *VDirStorage) GetEvent(id string) (*ical.Event, error) {
 	// Find the event file
 	filename := fmt.Sprintf("%s.ics", id)
 	filePath := filepath.Join(s.BasePath, filename)
@@ -203,27 +177,17 @@ func (s *VDirStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 	}
 
 	// Create a basic event with the raw data
-	event := &parser.CalendarEvent{
+	event := &ical.Event{
 		UID:     id,
 		RawData: data,
 	}
 
 	// Extract minimal information for display purposes
-	var cal *ical.Calendar
-	var parseErr error
-	
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "Warning: Panic in GetEvent iCal decoder: %v, returning basic event\n", r)
-				parseErr = fmt.Errorf("panic in decoder: %v", r)
-				// Set default summary for events that can't be parsed
-				event.Summary = "Unparseable Calendar Event"
-			}
-		}()
-		
-		cal, parseErr = ical.NewDecoder(bytes.NewReader(data)).Decode()
-	}()
+	cal, parseErr := ical.DecodeCalendar(data)
+	if parseErr != nil {
+		// Set default summary for events that can't be parsed
+		event.Summary = "Unparseable Calendar Event"
+	}
 	
 	if parseErr == nil { // Ignore parsing errors, we already have the raw data
 		for _, component := range cal.Children {
@@ -244,14 +208,14 @@ func (s *VDirStorage) GetEvent(id string) (*parser.CalendarEvent, error) {
 }
 
 // ListEvents lists all events in the vdir storage
-func (s *VDirStorage) ListEvents() ([]*parser.CalendarEvent, error) {
+func (s *VDirStorage) ListEvents() ([]*ical.Event, error) {
 	// List all .ics files in the directory
 	entries, err := os.ReadDir(s.BasePath)
 	if err != nil {
 		return nil, fmt.Errorf("reading storage directory: %w", err)
 	}
 
-	var events []*parser.CalendarEvent
+	var events []*ical.Event
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".ics") {
 			continue
