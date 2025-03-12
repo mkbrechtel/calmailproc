@@ -4,6 +4,8 @@
 
 A calendar mail processor that extracts calendar event information from emails containing iCalendar invitation events and stores them in various calendar storage formats.
 
+STATUS: WIP with major issues still.
+
 ## Features
 
 - **Input Options**:
