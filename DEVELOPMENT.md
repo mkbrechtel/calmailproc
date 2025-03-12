@@ -52,9 +52,24 @@ The parser functionality is split into two modules with distinct responsibilitie
   - Must check sequence numbers to avoid overwriting newer events with older ones
   - Must implement atomic operations where possible
 
-### 3. Processor Module (`/processor`)
+### 3. Calendar Manager Module (`/manager`)
 
-**Primary responsibility**: Orchestrate flow between parser and storage, applying business logic.
+**Primary responsibility**: Handle all calendar event manipulations and business logic.
+
+- **Core functions**:
+  - Update attendee status based on REPLY methods
+  - Handle recurring event updates (instances with RECURRENCE-ID)
+  - Provide centralized calendar manipulation functionality
+  - Ensure calendar data integrity
+
+- **Constraints**:
+  - Should maintain clean separation from storage logic
+  - Should encapsulate all calendar-specific manipulations
+  - Should focus on logical operations, not persistence
+
+### 4. Processor Module (`/processor`)
+
+**Primary responsibility**: Orchestrate flow between parser, manager, and storage, applying business logic.
 
 - **Core functions**:
   - Determine whether events should be stored or ignored
@@ -71,7 +86,7 @@ The parser functionality is split into two modules with distinct responsibilitie
 
 The processor module is divided into specialized sub-modules for each operation mode:
 
-#### 3.1 Shared Processor functionality (`/processor`)
+#### 4.1 Shared Processor functionality (`/processor`)
 
 **Primary responsibility**: Handle general event processing logic common to all modes.
 
@@ -79,8 +94,9 @@ The processor module is divided into specialized sub-modules for each operation 
   - Implement sequence number checking
   - Apply METHOD handling rules
   - Provide decision framework for event storage
+  - Coordinate between the Calendar Manager and Storage
 
-#### 3.2 Stdin Processor (`/processor/stdin`)
+#### 4.2 Stdin Processor (`/processor/stdin`)
 
 **Primary responsibility**: Process single emails from stdin with immediate feedback.
 
@@ -89,7 +105,7 @@ The processor module is divided into specialized sub-modules for each operation 
   - Immediate output formatting
   - Return appropriate exit codes for pipeline integration
 
-#### 3.3 Maildir Processor (`/processor/maildir`)
+#### 4.3 Maildir Processor (`/processor/maildir`)
 
 **Primary responsibility**: Batch process multiple emails from maildir structure.
 
@@ -99,7 +115,7 @@ The processor module is divided into specialized sub-modules for each operation 
   - Generate batch summary statistics
   - Handle directory locking and file status transitions
 
-### 4. Main Application
+### 5. Main Application
 
 **Primary responsibility**: Handle user input, configure components, and set up the processing pipeline.
 
@@ -114,17 +130,19 @@ The processor module is divided into specialized sub-modules for each operation 
 1. Email is read from stdin or maildir
 2. Email parser extracts basic email data and identifies calendar attachments
 3. iCalendar parser extracts calendar event data when present
-4. Processor applies business logic to the parsed data
-5. Storage saves the event according to its implementation rules
-6. Output is presented to the user
+4. Processor applies general business logic to the parsed data
+5. Calendar Manager handles any calendar-specific operations (attendee updates, recurring event handling)
+6. Storage saves the event according to its implementation rules
+7. Output is presented to the user
 
 ## Key Design Principles
 
 1. **Clear separation of concerns**:
    - Email Parser: Extract email data only
    - iCalendar Parser: Parse calendar data only
+   - Calendar Manager: Handle calendar-specific logic and manipulations
    - Storage: Store/retrieve data, maintain data integrity
-   - Processor: Apply business logic, make decisions
+   - Processor: Orchestrate flow, make high-level decisions
 
 2. **Error handling**:
    - Each layer should handle its own errors
@@ -135,8 +153,9 @@ The processor module is divided into specialized sub-modules for each operation 
 3. **Immutable data flow**:
    - Email parser should produce email data without interpretation
    - iCalendar parser should extract calendar data without modifying it
-   - Processor should make decisions but not modify raw data
-   - Storage should handle all format-specific transformations
+   - Calendar Manager should handle calendar-specific manipulations
+   - Processor should coordinate but not directly modify data
+   - Storage should handle all persistence-related transformations
 
 4. **Simplicity over complexity**:
    - Prefer clear, simple code over clever optimizations
@@ -165,9 +184,11 @@ To further improve the project architecture:
    - Move format-specific logic to appropriate layers
    - Make business rules explicit and configurable
 
-4. **Attendee updates module**:
-   - Implement attendee update logic in separate module
-   - Don't do the attendee update logic in the storage module but in the processor module
+4. **✅ Calendar Manager module**:
+   - ✅ Implement calendar manipulation logic in separate module - DONE
+   - ✅ Extract attendee update logic from storage modules - DONE
+   - ✅ Extract recurring event handling from storage modules - DONE
+   - Implement future calendar-specific operations in this module
 
 ## Calendar Event Handling
 
@@ -193,8 +214,9 @@ The application handles various types of calendar events according to the iCalen
    - Email Parser: Detect email with calendar attachment
    - iCal Parser: Extract UID, method (REPLY), and raw data
    - Processor: Check if reply processing is enabled
-   - Processor: If enabled, pass to storage; otherwise, ignore
-   - Storage: Update participant status in existing event
+   - Processor: If enabled, retrieve existing event and pass to Calendar Manager
+   - Calendar Manager: Update participant status in event
+   - Storage: Store the updated event
 
 ### Recurring Events
 
@@ -207,11 +229,13 @@ Recurring events require special handling:
 2. **Exception to Recurring Event**
    - Has both RRULE and RECURRENCE-ID
    - Processor: Identify as modification to specific instance
-   - Storage: Preserve master event while adding/updating exception
+   - Calendar Manager: Handle recurring event update
+   - Storage: Store the updated calendar with exception
 
 3. **Cancellation of Specific Instance**
    - Has RECURRENCE-ID and METHOD:CANCEL
-   - Storage: Mark specific instance as cancelled without affecting master event
+   - Calendar Manager: Mark specific instance as cancelled without affecting master event
+   - Storage: Store the updated calendar
 
 ### Sequence Numbers
 
@@ -234,8 +258,9 @@ Sequence numbers prevent out-of-order processing:
 1. **Unit tests**:
    - Email Parser: Test extraction from various email formats
    - iCal Parser: Test calendar data extraction and handling
+   - Calendar Manager: Test calendar manipulation functionality
    - Storage: Test CRUD operations on calendar data
-   - Processor: Test business logic and decision making
+   - Processor: Test orchestration and decision making
 
 2. **Integration tests**:
    - Test parser + processor + storage with realistic emails

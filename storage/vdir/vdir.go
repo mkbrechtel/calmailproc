@@ -6,12 +6,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mkbrechtel/calmailproc/manager"
 	"github.com/mkbrechtel/calmailproc/parser/ical"
 )
 
 // VDirStorage implements the storage.Storage interface using the vdir format
 type VDirStorage struct {
-	BasePath string
+	BasePath        string
+	calendarManager manager.Calendar
 }
 
 // NewVDirStorage creates a new VDirStorage with the given base path
@@ -22,7 +24,8 @@ func NewVDirStorage(basePath string) (*VDirStorage, error) {
 	}
 
 	return &VDirStorage{
-		BasePath: basePath,
+		BasePath:        basePath,
+		calendarManager: manager.NewDefaultManager(),
 	}, nil
 }
 
@@ -91,74 +94,56 @@ func (s *VDirStorage) StoreEvent(event *ical.Event) error {
 		return fmt.Errorf("no VEVENT component found in calendar data")
 	}
 
+	// Load existing event if possible (for METHOD:REPLY handling)
+	var existingEvent *ical.Event
+	if event.Method == "REPLY" {
+		existingData, err := os.ReadFile(filePath)
+		if err == nil {
+			existingEvent = &ical.Event{
+				UID:     event.UID,
+				RawData: existingData,
+			}
+			
+			// Try to update attendee status
+			if err := s.calendarManager.UpdateAttendeeStatus(event, existingEvent); err != nil {
+				// Log but continue with regular processing
+				fmt.Printf("Warning: Failed to update attendee status: %v\n", err)
+			} else {
+				// Successfully updated attendee status, write and return
+				if err := os.WriteFile(filePath, existingEvent.RawData, 0644); err != nil {
+					return fmt.Errorf("writing updated calendar file: %w", err)
+				}
+				return nil
+			}
+		}
+	}
+
 	// Check if this is a modification to a specific occurrence (has RECURRENCE-ID)
 	recurrenceID := newEvent.Props.Get("RECURRENCE-ID")
 	if recurrenceID != nil {
 		// This is an update to a specific occurrence
-		return s.handleRecurringEventUpdate(existingCal, newEvent, methodValue, filePath)
+		updatedCal, err := s.calendarManager.HandleRecurringEventUpdate(existingCal, newEvent, methodValue)
+		if err != nil {
+			return fmt.Errorf("handling recurring event update: %w", err)
+		}
+		
+		// Write the updated calendar back to the file
+		calBytes, err := ical.EncodeCalendar(updatedCal)
+		if err != nil {
+			return fmt.Errorf("encoding updated calendar: %w", err)
+		}
+		
+		if err := os.WriteFile(filePath, calBytes, 0644); err != nil {
+			return fmt.Errorf("writing updated calendar file: %w", err)
+		}
+		
+		return nil
 	}
 
 	// This is a new master event or a complete update
 	// Just write the new data, overwriting the old file
 	if err := os.WriteFile(filePath, event.RawData, 0644); err != nil {
 		return fmt.Errorf("writing calendar file: %w", err)
-	}
-
-	return nil
-}
-
-// handleRecurringEventUpdate merges a recurring event update into the existing calendar file
-func (s *VDirStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, newEvent *ical.Component, methodValue string, filePath string) error {
-	recurrenceID := newEvent.Props.Get("RECURRENCE-ID")
-	if recurrenceID == nil {
-		return fmt.Errorf("missing RECURRENCE-ID in event update")
-	}
-
-	// Find if this specific occurrence already exists in the calendar
-	foundExisting := false
-	for i, component := range existingCal.Children {
-		if component.Name != "VEVENT" {
-			continue
-		}
-
-		// Check if this is the same occurrence by matching RECURRENCE-ID
-		existingRecurrenceID := component.Props.Get("RECURRENCE-ID")
-		if existingRecurrenceID != nil && existingRecurrenceID.Value == recurrenceID.Value {
-			// Found the existing occurrence to update
-			foundExisting = true
-
-			// Handle cancellations (METHOD:CANCEL)
-			if methodValue == "CANCEL" {
-				// For cancellations, we update the status to CANCELLED
-				component.Props.Set(&ical.Prop{Name: "STATUS", Value: "CANCELLED"})
-			} else {
-				// Replace the existing occurrence with the new one
-				existingCal.Children[i] = newEvent
-			}
-			break
-		}
-	}
-
-	// If we didn't find an existing occurrence with this RECURRENCE-ID, add it
-	if !foundExisting {
-		if methodValue == "CANCEL" {
-			// For cancellations of instances we haven't seen before, create a new component with STATUS:CANCELLED
-			newEvent.Props.Set(&ical.Prop{Name: "STATUS", Value: "CANCELLED"})
-			existingCal.Children = append(existingCal.Children, newEvent)
-		} else {
-			// Add the new occurrence
-			existingCal.Children = append(existingCal.Children, newEvent)
-		}
-	}
-
-	// Write the updated calendar back to the file
-	calBytes, err := ical.EncodeCalendar(existingCal)
-	if err != nil {
-		return fmt.Errorf("encoding updated calendar: %w", err)
-	}
-
-	if err := os.WriteFile(filePath, calBytes, 0644); err != nil {
-		return fmt.Errorf("writing updated calendar file: %w", err)
 	}
 
 	return nil

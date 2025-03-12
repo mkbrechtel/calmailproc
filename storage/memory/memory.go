@@ -4,20 +4,23 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/mkbrechtel/calmailproc/manager"
 	"github.com/mkbrechtel/calmailproc/parser/ical"
 )
 
 // MemoryStorage implements the storage.Storage interface using an in-memory map
 // Primarily intended for testing
 type MemoryStorage struct {
-	events map[string]*ical.Event
-	mu     sync.RWMutex
+	events         map[string]*ical.Event
+	mu             sync.RWMutex
+	calendarManager manager.Calendar
 }
 
 // NewMemoryStorage creates a new in-memory storage
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
-		events: make(map[string]*ical.Event),
+		events:         make(map[string]*ical.Event),
+		calendarManager: manager.NewDefaultManager(),
 	}
 }
 
@@ -89,71 +92,41 @@ func (s *MemoryStorage) StoreEvent(event *ical.Event) error {
 		return fmt.Errorf("no VEVENT component found in calendar data")
 	}
 
+	// Handle METHOD:REPLY for attendee updates
+	if event.Method == "REPLY" && existingEvent != nil {
+		// Try to update attendee status
+		if err := s.calendarManager.UpdateAttendeeStatus(event, existingEvent); err != nil {
+			// Log the error but continue with regular processing
+			fmt.Printf("Warning: Failed to update attendee status: %v\n", err)
+		} else {
+			// Successfully updated attendee status, we're done
+			return nil
+		}
+	}
+	
 	// Check if this is a modification to a specific occurrence (has RECURRENCE-ID)
 	recurrenceID := newEvent.Props.Get("RECURRENCE-ID")
 	if recurrenceID != nil {
 		// This is an update to a specific occurrence
-		return s.handleRecurringEventUpdate(existingCal, newEvent, methodValue, event.UID)
+		updatedCal, err := s.calendarManager.HandleRecurringEventUpdate(existingCal, newEvent, methodValue)
+		if err != nil {
+			return fmt.Errorf("handling recurring event update: %w", err)
+		}
+		
+		// Encode the updated calendar back to bytes
+		calBytes, err := ical.EncodeCalendar(updatedCal)
+		if err != nil {
+			return fmt.Errorf("encoding updated calendar: %w", err)
+		}
+		
+		// Update the event in memory
+		s.events[event.UID].RawData = calBytes
+		return nil
 	}
 
 	// This is a new master event or a complete update
 	// Just replace the existing event
 	s.events[event.UID] = event
-	return nil
-}
-
-// handleRecurringEventUpdate merges a recurring event update into the existing calendar
-func (s *MemoryStorage) handleRecurringEventUpdate(existingCal *ical.Calendar, newEvent *ical.Component, methodValue string, uid string) error {
-	recurrenceID := newEvent.Props.Get("RECURRENCE-ID")
-	if recurrenceID == nil {
-		return fmt.Errorf("missing RECURRENCE-ID in event update")
-	}
-
-	// Find if this specific occurrence already exists in the calendar
-	foundExisting := false
-	for i, component := range existingCal.Children {
-		if component.Name != "VEVENT" {
-			continue
-		}
-
-		// Check if this is the same occurrence by matching RECURRENCE-ID
-		existingRecurrenceID := component.Props.Get("RECURRENCE-ID")
-		if existingRecurrenceID != nil && existingRecurrenceID.Value == recurrenceID.Value {
-			// Found the existing occurrence to update
-			foundExisting = true
-
-			// Handle cancellations (METHOD:CANCEL)
-			if methodValue == "CANCEL" {
-				// For cancellations, we update the status to CANCELLED
-				component.Props.Set(&ical.Prop{Name: "STATUS", Value: "CANCELLED"})
-			} else {
-				// Replace the existing occurrence with the new one
-				existingCal.Children[i] = newEvent
-			}
-			break
-		}
-	}
-
-	// If we didn't find an existing occurrence with this RECURRENCE-ID, add it
-	if !foundExisting {
-		if methodValue == "CANCEL" {
-			// For cancellations of instances we haven't seen before, create a new component with STATUS:CANCELLED
-			newEvent.Props.Set(&ical.Prop{Name: "STATUS", Value: "CANCELLED"})
-			existingCal.Children = append(existingCal.Children, newEvent)
-		} else {
-			// Add the new occurrence
-			existingCal.Children = append(existingCal.Children, newEvent)
-		}
-	}
-
-	// Encode the updated calendar back to bytes
-	calBytes, err := ical.EncodeCalendar(existingCal)
-	if err != nil {
-		return fmt.Errorf("encoding updated calendar: %w", err)
-	}
-
-	// Update the event in memory
-	s.events[uid].RawData = calBytes
 	return nil
 }
 

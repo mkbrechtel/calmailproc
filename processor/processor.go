@@ -4,21 +4,24 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/mkbrechtel/calmailproc/manager"
 	"github.com/mkbrechtel/calmailproc/parser/email"
 	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 // Processor handles processing emails with calendar events
 type Processor struct {
-	Storage        storage.Storage
-	ProcessReplies bool // Whether to process METHOD:REPLY to update attendee status
+	Storage         storage.Storage
+	ProcessReplies  bool // Whether to process METHOD:REPLY to update attendee status
+	CalendarManager manager.Calendar
 }
 
 // NewProcessor creates a new processor with the given storage
 func NewProcessor(storage storage.Storage, processReplies bool) *Processor {
 	return &Processor{
-		Storage:        storage,
-		ProcessReplies: processReplies,
+		Storage:         storage,
+		ProcessReplies:  processReplies,
+		CalendarManager: manager.NewDefaultManager(),
 	}
 }
 
@@ -32,11 +35,38 @@ func (p *Processor) ProcessEmail(r io.Reader, jsonOutput bool, storeEvent bool) 
 
 	// Process the calendar event if one was found
 	if storeEvent && parsedEmail.HasCalendar && parsedEmail.Event.UID != "" {
-		// Check if this is a METHOD:REPLY that we should ignore
-		if parsedEmail.Event.Method == "REPLY" && !p.ProcessReplies {
-			// Skip storing REPLY events when ProcessReplies is false
-			fmt.Println("Ignoring calendar REPLY method as configured")
+		// Check if this is a METHOD:REPLY
+		if parsedEmail.Event.Method == "REPLY" {
+			if !p.ProcessReplies {
+				// Skip storing REPLY events when ProcessReplies is false
+				fmt.Println("Ignoring calendar REPLY method as configured")
+			} else {
+				// Try to find the existing event to update attendee status
+				existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
+				if err == nil && existingEvent != nil {
+					// Process the reply to update attendee status
+					if err := p.CalendarManager.UpdateAttendeeStatus(parsedEmail.Event, existingEvent); err != nil {
+						fmt.Printf("Warning: Failed to update attendee status: %v\n", err)
+						
+						// If attendee update fails, store the event normally
+						if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
+							return fmt.Errorf("storing event: %w", err)
+						}
+					} else {
+						// Store the updated event
+						if err := p.Storage.StoreEvent(existingEvent); err != nil {
+							return fmt.Errorf("storing updated event: %w", err)
+						}
+					}
+				} else {
+					// No existing event found, store the new one
+					if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
+						return fmt.Errorf("storing event: %w", err)
+					}
+				}
+			}
 		} else {
+			// For non-REPLY methods
 			// Check for existing event with the same UID
 			existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
 			if err == nil && existingEvent != nil {
