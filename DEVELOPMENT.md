@@ -113,6 +113,63 @@ To rebuild the project with a cleaner architecture:
    - Move format-specific logic to appropriate layers
    - Make business rules explicit and configurable
 
+## Calendar Event Handling
+
+The application handles various types of calendar events according to the iCalendar specification (RFC 5545). Here's how each type should be handled:
+
+### Event Types and Methods
+
+1. **REQUEST (New Event or Update)**
+   - Parser: Extract UID, sequence number, and raw data
+   - Processor: Check for existing event with same UID
+   - Storage: Store as new event if UID not found
+   - Storage: Update existing event if sequence number is higher
+
+2. **CANCEL (Event Cancellation)**
+   - Parser: Extract UID, sequence number, and raw data
+   - Processor: Check for existing event with same UID
+   - Storage: Update event status to CANCELLED
+   - Storage: Do not overwrite if existing sequence number is higher
+
+3. **REPLY (Attendance Response)**
+   - Parser: Extract UID, method, and raw data
+   - Processor: Check if reply processing is enabled
+   - Processor: If enabled, pass to storage; otherwise, ignore
+   - Storage: Update participant status in existing event
+
+### Recurring Events
+
+Recurring events require special handling:
+
+1. **Master Recurring Event**
+   - Has RRULE property but no RECURRENCE-ID
+   - Storage: Store as normal event
+
+2. **Exception to Recurring Event**
+   - Has both RRULE and RECURRENCE-ID
+   - Processor: Identify as modification to specific instance
+   - Storage: Preserve master event while adding/updating exception
+
+3. **Cancellation of Specific Instance**
+   - Has RECURRENCE-ID and METHOD:CANCEL
+   - Storage: Mark specific instance as cancelled without affecting master event
+
+### Sequence Numbers
+
+Sequence numbers prevent out-of-order processing:
+
+1. **Higher Sequence Number**
+   - Newer version of an event
+   - Should replace older versions
+
+2. **Lower Sequence Number**
+   - Older version of an event
+   - Should be ignored if newer version exists
+
+3. **Equal Sequence Number**
+   - Special case for compatibility
+   - May apply as update if implementation allows
+
 ## Testing Strategy
 
 1. **Unit tests**:
@@ -128,6 +185,125 @@ To rebuild the project with a cleaner architecture:
    - Maintain clean, realistic test emails in the test directory
    - Document the purpose of each test email
    - Include edge cases and error conditions
+
+## Operation Modes
+
+The application operates in two distinct modes, each with its own workflow and use cases:
+
+### 1. Stdin Mode
+
+In Stdin mode, the application processes a single email message from standard input.
+
+**Workflow:**
+1. Email data is read from stdin
+2. The parser extracts calendar information 
+3. The processor applies business logic
+4. If enabled, the event is stored in the configured storage backend
+5. Output is presented on stdout in the specified format (plain text or JSON)
+
+**Use Cases:**
+- Integration with mail delivery agents (e.g., procmail, sieve)
+- Processing a single email via pipe in shell
+- Testing and debugging individual email handling
+
+**Example:**
+```bash
+cat test/maildir/cur/example-mail-01.eml | ./calmailproc --store
+```
+
+**Configuration Options:**
+- `--store`: Enable storing events (default: false)
+- `--format=json`: Output in JSON format (default: plain text)
+- `--process-replies`: Process METHOD:REPLY emails (default: false)
+
+### 2. Maildir Mode
+
+In Maildir mode, the application processes multiple emails from a maildir directory structure.
+
+**Workflow:**
+1. Scan the maildir directory for email files
+2. Process each email file through the parser and processor
+3. Store events in the configured backend (if enabled)
+4. Generate a summary of processed emails
+5. Optionally scan for subdirectories and process them recursively
+
+**Maildir Structure:**
+- `new/`: Directory for new, unread mail
+- `cur/`: Directory for read mail
+- `tmp/`: Directory for temporary mail files
+
+**Use Cases:**
+- Batch processing of existing email archives
+- Scheduled processing via cron jobs
+- Initial migration of calendar data from email to calendar storage
+
+**Example:**
+```bash
+./calmailproc --maildir=/var/mail/user/Calendars --store --recursive
+```
+
+**Configuration Options:**
+- `--maildir`: Path to maildir directory
+- `--recursive`: Process subdirectories recursively
+- `--store`: Enable storing events
+- `--process-replies`: Process METHOD:REPLY emails
+- `--verbose`: Show detailed output for each email
+
+## Error Handling Strategy
+
+Error handling is crucial for a reliable application. Follow these principles:
+
+### Error Categories
+
+1. **Fatal Errors**: Application cannot continue
+   - Configuration errors
+   - Critical resource unavailability (e.g., storage not writable)
+   - Exit with non-zero code and clear error message
+
+2. **Operational Errors**: Can continue despite issues
+   - Individual email parsing failures
+   - Failed updates due to sequence rules
+   - Log error and continue processing other items
+
+3. **Data Validation Errors**: Input data problems
+   - Malformed email format
+   - Missing required calendar fields
+   - Log issue, skip problematic entry, continue processing
+
+### Error Handling Patterns
+
+1. **Return errors with context**
+   ```go
+   if err != nil {
+       return fmt.Errorf("parsing email: %w", err)
+   }
+   ```
+
+2. **Log and continue**
+   ```go
+   events, err := store.ListEvents()
+   if err != nil {
+       log.Printf("Error listing events: %v, continuing with empty list", err)
+       events = []*CalendarEvent{}
+   }
+   ```
+
+3. **Graceful degradation**
+   ```go
+   // If we can't parse all calendar details, extract what we can
+   if err := parseDetails(data); err != nil {
+       log.Printf("Warning: Partial calendar data extracted: %v", err)
+       // Continue with partial data
+   }
+   ```
+
+### Avoiding Error Handling Pitfalls
+
+1. **No Panics**: Never use panic except in truly unrecoverable scenarios
+2. **No Silent Failures**: Always log errors, even if continuing
+3. **No Special Error Types**: Use standard error wrapping/unwrapping
+4. **Clear Error Messages**: Make error messages actionable and clear
+5. **Consistent Return Types**: Don't return nil objects with side effects
 
 ## Development Workflow
 
