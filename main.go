@@ -8,6 +8,7 @@ import (
 
 	"github.com/mkbrechtel/calmailproc/processor"
 	"github.com/mkbrechtel/calmailproc/processor/maildir"
+	"github.com/mkbrechtel/calmailproc/processor/stdin"
 	"github.com/mkbrechtel/calmailproc/storage"
 	"github.com/mkbrechtel/calmailproc/storage/icalfile"
 	"github.com/mkbrechtel/calmailproc/storage/vdir"
@@ -73,7 +74,7 @@ func main() {
 	}
 
 	// Default: process from stdin
-	if err := proc.ProcessEmail(os.Stdin, *jsonOutput, *storeEvent); err != nil {
+	if err := stdin.Process(proc, *jsonOutput, *storeEvent); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
