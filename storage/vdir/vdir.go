@@ -28,7 +28,6 @@ func NewVDirStorage(basePath string) (*VDirStorage, error) {
 		calendarManager: manager.NewDefaultManager(),
 	}, nil
 }
-
 // StoreEvent stores a calendar event in the vdir format
 func (s *VDirStorage) StoreEvent(event *ical.Event) error {
 	if event.UID == "" {
@@ -39,8 +38,9 @@ func (s *VDirStorage) StoreEvent(event *ical.Event) error {
 		return fmt.Errorf("no raw calendar data to store")
 	}
 
-	// Create the event file with .ics extension
-	filename := fmt.Sprintf("%s.ics", event.UID)
+	// Create the event file with a hashed filename and .ics extension
+	hashedUID := HashFilename(event.UID)
+	filename := fmt.Sprintf("%s.ics", hashedUID)
 	filePath := filepath.Join(s.BasePath, filename)
 
 	// Parse the iCalendar data using panic recovery
@@ -151,8 +151,9 @@ func (s *VDirStorage) StoreEvent(event *ical.Event) error {
 
 // GetEvent retrieves a calendar event from the vdir storage
 func (s *VDirStorage) GetEvent(id string) (*ical.Event, error) {
-	// Find the event file
-	filename := fmt.Sprintf("%s.ics", id)
+	// Find the event file using the hashed ID
+	hashedID := HashFilename(id)
+	filename := fmt.Sprintf("%s.ics", hashedID)
 	filePath := filepath.Join(s.BasePath, filename)
 
 	// Read the file
@@ -206,13 +207,55 @@ func (s *VDirStorage) ListEvents() ([]*ical.Event, error) {
 			continue
 		}
 
-		// Extract the UID from the filename
-		uid := strings.TrimSuffix(entry.Name(), ".ics")
-
-		// Get the event
-		event, err := s.GetEvent(uid)
+		// Read the file to extract the actual UID
+		filePath := filepath.Join(s.BasePath, entry.Name())
+		data, err := os.ReadFile(filePath)
 		if err != nil {
 			continue
+		}
+
+		// Parse the iCalendar data to get the UID
+		cal, err := ical.DecodeCalendar(data)
+		if err != nil {
+			continue
+		}
+
+		var uid string
+		for _, component := range cal.Children {
+			if component.Name != "VEVENT" {
+				continue
+			}
+
+			// Extract UID
+			uidProp := component.Props.Get("UID")
+			if uidProp != nil {
+				uid = uidProp.Value
+				break
+			}
+		}
+
+		if uid == "" {
+			continue
+		}
+
+		// Create event with the actual UID and raw data
+		event := &ical.Event{
+			UID:     uid,
+			RawData: data,
+		}
+
+		// Extract summary if available (reusing code from GetEvent)
+		for _, component := range cal.Children {
+			if component.Name != "VEVENT" {
+				continue
+			}
+
+			// Extract Summary if available
+			summaryProp := component.Props.Get("SUMMARY")
+			if summaryProp != nil {
+				event.Summary = summaryProp.Value
+			}
+			break
 		}
 
 		events = append(events, event)
@@ -223,8 +266,9 @@ func (s *VDirStorage) ListEvents() ([]*ical.Event, error) {
 
 // DeleteEvent deletes a calendar event from the vdir storage
 func (s *VDirStorage) DeleteEvent(id string) error {
-	// Find the event file
-	filename := fmt.Sprintf("%s.ics", id)
+	// Find the event file using the hashed ID
+	hashedID := HashFilename(id)
+	filename := fmt.Sprintf("%s.ics", hashedID)
 	filePath := filepath.Join(s.BasePath, filename)
 
 	// Delete the file
