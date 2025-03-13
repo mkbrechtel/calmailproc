@@ -4,23 +4,20 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/mkbrechtel/calmailproc/manager"
 	"github.com/mkbrechtel/calmailproc/parser/ical"
 )
 
 // MemoryStorage implements the storage.Storage interface using an in-memory map
 // Primarily intended for testing
 type MemoryStorage struct {
-	events         map[string]*ical.Event
-	mu             sync.RWMutex
-	calendarManager manager.Calendar
+	rawData map[string][]byte  // Simple key-value store with UID as key and raw data as value
+	mu      sync.RWMutex
 }
 
 // NewMemoryStorage creates a new in-memory storage
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
-		events:         make(map[string]*ical.Event),
-		calendarManager: manager.NewDefaultManager(),
+		rawData: make(map[string][]byte),
 	}
 }
 
@@ -37,96 +34,8 @@ func (s *MemoryStorage) StoreEvent(event *ical.Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Check if we already have this event to handle recurring event updates
-	existingEvent, exists := s.events[event.UID]
-	if !exists {
-		// New event, just store it
-		// Make a copy to avoid potential references issues
-		eventCopy := &ical.Event{
-			UID:         event.UID,
-			RawData:     make([]byte, len(event.RawData)),
-			Summary:     event.Summary,
-			Start:       event.Start,
-			End:         event.End,
-			Location:    event.Location,
-			Organizer:   event.Organizer,
-			Description: event.Description,
-			Method:      event.Method,
-		}
-		copy(eventCopy.RawData, event.RawData)
-		s.events[event.UID] = eventCopy
-		return nil
-	}
-
-	// Parse the existing event data
-	existingCal, err := ical.DecodeCalendar(existingEvent.RawData)
-	if err != nil {
-		// Can't parse existing, overwrite with new data
-		s.events[event.UID] = event
-		return nil
-	}
-
-	// Parse the new event data
-	newCal, err := ical.DecodeCalendar(event.RawData)
-	if err != nil {
-		// Can't parse new data, keep existing
-		return fmt.Errorf("parsing new event data: %w", err)
-	}
-
-	// Extract the METHOD if present
-	methodValue := ""
-	methodProp := newCal.Props.Get("METHOD")
-	if methodProp != nil {
-		methodValue = methodProp.Value
-	}
-
-	// Extract the current event from the new data
-	var newEvent *ical.Component
-	for _, component := range newCal.Children {
-		if component.Name == "VEVENT" {
-			newEvent = component
-			break
-		}
-	}
-	if newEvent == nil {
-		return fmt.Errorf("no VEVENT component found in calendar data")
-	}
-
-	// Handle METHOD:REPLY for attendee updates
-	if event.Method == "REPLY" && existingEvent != nil {
-		// Try to update attendee status
-		if err := s.calendarManager.UpdateAttendeeStatus(event, existingEvent); err != nil {
-			// Log the error but continue with regular processing
-			fmt.Printf("Warning: Failed to update attendee status: %v\n", err)
-		} else {
-			// Successfully updated attendee status, we're done
-			return nil
-		}
-	}
-	
-	// Check if this is a modification to a specific occurrence (has RECURRENCE-ID)
-	recurrenceID := newEvent.Props.Get("RECURRENCE-ID")
-	if recurrenceID != nil {
-		// This is an update to a specific occurrence
-		updatedCal, err := s.calendarManager.HandleRecurringEventUpdate(existingCal, newEvent, methodValue)
-		if err != nil {
-			return fmt.Errorf("handling recurring event update: %w", err)
-		}
-		
-		// Encode the updated calendar back to bytes
-		calBytes, err := ical.EncodeCalendar(updatedCal)
-		if err != nil {
-			return fmt.Errorf("encoding updated calendar: %w", err)
-		}
-		
-		// Update the event in memory
-		s.events[event.UID].RawData = calBytes
-		return nil
-	}
-
-	// This is a new master event or a complete update
-	// Just replace the existing event
-	s.events[event.UID] = event
+	// Simply store the raw data by UID
+	s.rawData[event.UID] = event.RawData
 	return nil
 }
 
@@ -135,26 +44,18 @@ func (s *MemoryStorage) GetEvent(id string) (*ical.Event, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	event, ok := s.events[id]
+	rawData, ok := s.rawData[id]
 	if !ok {
 		return nil, fmt.Errorf("event not found: %s", id)
 	}
 
-	// Return a copy to prevent modification of internal state
-	eventCopy := &ical.Event{
-		UID:         event.UID,
-		RawData:     make([]byte, len(event.RawData)),
-		Summary:     event.Summary,
-		Start:       event.Start,
-		End:         event.End,
-		Location:    event.Location,
-		Organizer:   event.Organizer,
-		Description: event.Description,
-		Method:      event.Method,
+	// Just parse the raw data to create an event object
+	event, err := ical.ParseICalData(rawData)
+	if err != nil {
+		return nil, fmt.Errorf("parsing stored event: %w", err)
 	}
-	copy(eventCopy.RawData, event.RawData)
 
-	return eventCopy, nil
+	return event, nil
 }
 
 // ListEvents lists all events in memory
@@ -162,22 +63,15 @@ func (s *MemoryStorage) ListEvents() ([]*ical.Event, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	events := make([]*ical.Event, 0, len(s.events))
-	for _, event := range s.events {
-		// Create a copy of each event
-		eventCopy := &ical.Event{
-			UID:         event.UID,
-			RawData:     make([]byte, len(event.RawData)),
-			Summary:     event.Summary,
-			Start:       event.Start,
-			End:         event.End,
-			Location:    event.Location,
-			Organizer:   event.Organizer,
-			Description: event.Description,
-			Method:      event.Method,
+	events := make([]*ical.Event, 0, len(s.rawData))
+	for _, data := range s.rawData {
+		// Parse each raw data to create event objects
+		event, err := ical.ParseICalData(data)
+		if err != nil {
+			// Skip events that can't be parsed
+			continue
 		}
-		copy(eventCopy.RawData, event.RawData)
-		events = append(events, eventCopy)
+		events = append(events, event)
 	}
 
 	return events, nil
@@ -188,11 +82,11 @@ func (s *MemoryStorage) DeleteEvent(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, ok := s.events[id]; !ok {
+	if _, ok := s.rawData[id]; !ok {
 		return fmt.Errorf("event not found: %s", id)
 	}
 
-	delete(s.events, id)
+	delete(s.rawData, id)
 	return nil
 }
 
@@ -200,12 +94,12 @@ func (s *MemoryStorage) DeleteEvent(id string) error {
 func (s *MemoryStorage) GetEventCount() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.events)
+	return len(s.rawData)
 }
 
 // Clear removes all events from memory (useful for testing)
 func (s *MemoryStorage) Clear() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.events = make(map[string]*ical.Event)
+	s.rawData = make(map[string][]byte)
 }
