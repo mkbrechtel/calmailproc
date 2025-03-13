@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mkbrechtel/calmailproc/parser/ical"
 	"github.com/mkbrechtel/calmailproc/storage/memory"
 )
 
@@ -348,5 +349,145 @@ func TestRecurringEventSequence(t *testing.T) {
 	// Verify still the same UID
 	if event.UID != recurringUID {
 		t.Errorf("Wrong event UID after cancellation: %s", event.UID)
+	}
+}
+
+func TestOutOfOrderEventSequence(t *testing.T) {
+	// Test processing of event updates that arrive in numeric order (16-20)
+	// but contain out-of-sequence SEQUENCE numbers:
+	// File 16: SEQUENCE:0 (original)
+	// File 20: SEQUENCE:1 (first update)
+	// File 19: SEQUENCE:2 (second update)
+	// File 17: SEQUENCE:3 (third update)
+	// File 18: SEQUENCE:4 (fourth update)
+	
+	memStorage := memory.NewMemoryStorage()
+	proc := NewProcessor(memStorage, true)
+
+	// Process emails in numerical order (16-20)
+	// The processor should correctly handle the out-of-sequence numbers
+	
+	// First, process the original event (sequence 0)
+	file16, err := os.Open("../test/maildir/cur/example-mail-16.eml")
+	if err != nil {
+		t.Fatalf("Failed to open event file 16: %v", err)
+	}
+	err = proc.ProcessEmail(file16, false, true)
+	file16.Close()
+	if err != nil {
+		t.Fatalf("Failed to process event 16: %v", err)
+	}
+
+	// Verify we have 1 event
+	count := memStorage.GetEventCount()
+	if count != 1 {
+		t.Errorf("Expected 1 event after processing mail 16, got %d", count)
+	}
+	
+	// Process the third update (sequence 3)
+	file17, err := os.Open("../test/maildir/cur/example-mail-17.eml")
+	if err != nil {
+		t.Fatalf("Failed to open event file 17: %v", err)
+	}
+	err = proc.ProcessEmail(file17, false, true)
+	file17.Close()
+	if err != nil {
+		t.Fatalf("Failed to process event 17: %v", err)
+	}
+
+	// Verify we still have 1 event
+	count = memStorage.GetEventCount()
+	if count != 1 {
+		t.Errorf("Expected 1 event after processing mail 17, got %d", count)
+	}
+
+	// Process the fourth update (sequence 4) 
+	file18, err := os.Open("../test/maildir/cur/example-mail-18.eml")
+	if err != nil {
+		t.Fatalf("Failed to open event file 18: %v", err)
+	}
+	err = proc.ProcessEmail(file18, false, true)
+	file18.Close()
+	if err != nil {
+		t.Fatalf("Failed to process event 18: %v", err)
+	}
+
+	// Verify we still have 1 event
+	count = memStorage.GetEventCount()
+	if count != 1 {
+		t.Errorf("Expected 1 event after processing mail 18, got %d", count)
+	}
+
+	// Process the second update (sequence 2)
+	file19, err := os.Open("../test/maildir/cur/example-mail-19.eml")
+	if err != nil {
+		t.Fatalf("Failed to open event file 19: %v", err)
+	}
+	err = proc.ProcessEmail(file19, false, true)
+	file19.Close()
+	if err != nil {
+		t.Fatalf("Failed to process event 19: %v", err)
+	}
+
+	// Verify we still have 1 event (sequence 4 should be retained)
+	count = memStorage.GetEventCount()
+	if count != 1 {
+		t.Errorf("Expected 1 event after processing mail 19, got %d", count)
+	}
+
+	// Process the first update (sequence 1)
+	file20, err := os.Open("../test/maildir/cur/example-mail-20.eml")
+	if err != nil {
+		t.Fatalf("Failed to open event file 20: %v", err)
+	}
+	err = proc.ProcessEmail(file20, false, true)
+	file20.Close()
+	if err != nil {
+		t.Fatalf("Failed to process event 20: %v", err)
+	}
+
+	// Verify we still have 1 event (sequence 4 should be retained)
+	count = memStorage.GetEventCount()
+	if count != 1 {
+		t.Errorf("Expected 1 event after processing mail 20, got %d", count)
+	}
+
+	// Retrieve the final event and check properties
+	events, err := memStorage.ListEvents()
+	if err != nil || len(events) != 1 {
+		t.Fatalf("Failed to list events or wrong count: %v", err)
+	}
+
+	finalEvent := events[0]
+	
+	// Check that the processor kept the highest sequence number (4)
+	// from example-mail-18, which should have overridden all others
+	expectedSummary := "Test 7"
+	if finalEvent.Summary != expectedSummary {
+		t.Errorf("Wrong event summary: got %s, expected %s", finalEvent.Summary, expectedSummary)
+	}
+	
+	// Need to check the sequence in the raw data since memory store doesn't set Sequence field
+	cal, err := ical.DecodeCalendar(finalEvent.RawData)
+	if err != nil {
+		t.Fatalf("Failed to parse calendar data: %v", err)
+	}
+
+	var sequenceValue string
+	for _, component := range cal.Children {
+		if component.Name != "VEVENT" {
+			continue
+		}
+		
+		sequenceProp := component.Props.Get("SEQUENCE")
+		if sequenceProp != nil {
+			sequenceValue = sequenceProp.Value
+			break
+		}
+	}
+
+	// The sequence should be 4 (from mail 18)
+	if sequenceValue != "4" {
+		t.Errorf("Wrong sequence number: got %s, expected 4", sequenceValue)
 	}
 }
