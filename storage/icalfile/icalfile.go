@@ -3,6 +3,7 @@ package icalfile
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/mkbrechtel/calmailproc/parser/ical"
@@ -22,17 +23,10 @@ func NewICalFileStorage(filePath string) (*ICalFileStorage, error) {
 		FilePath: filePath,
 	}
 
-	// Create an empty calendar file if it doesn't exist
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		// Create a minimal valid iCalendar file
-		cal := ical.NewCalendar()
-		initialContent, err := ical.EncodeCalendar(cal)
-		if err != nil {
-			return nil, fmt.Errorf("creating initial calendar content: %w", err)
-		}
-		if err := os.WriteFile(filePath, initialContent, 0644); err != nil {
-			return nil, fmt.Errorf("creating initial calendar file: %w", err)
-		}
+	// Create the directory if it doesn't exist
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("creating directory for calendar file: %w", err)
 	}
 
 	return storage, nil
@@ -53,17 +47,23 @@ func (s *ICalFileStorage) StoreEvent(event *ical.Event) error {
 		return fmt.Errorf("no raw calendar data to store")
 	}
 
-	// Read the existing calendar file
+	// Check if file exists and read it
+	var existingCal *ical.Calendar
 	existingData, err := os.ReadFile(s.FilePath)
 	if err != nil {
-		return fmt.Errorf("reading calendar file: %w", err)
-	}
-
-	// Parse the existing calendar
-	existingCal, err := ical.DecodeCalendar(existingData)
-	if err != nil {
-		// If we can't parse it, create a new calendar
-		existingCal = ical.NewCalendar()
+		if os.IsNotExist(err) {
+			// Create a new calendar if the file doesn't exist
+			existingCal = ical.NewCalendar()
+		} else {
+			return fmt.Errorf("reading calendar file: %w", err)
+		}
+	} else {
+		// Parse the existing calendar
+		existingCal, err = ical.DecodeCalendar(existingData)
+		if err != nil {
+			// If we can't parse it, create a new calendar
+			existingCal = ical.NewCalendar()
+		}
 	}
 
 	// Parse the new event data to extract VEVENT components
