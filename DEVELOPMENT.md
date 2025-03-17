@@ -397,3 +397,8 @@ Error handling is crucial for a reliable application. Follow these principles:
 3. Format code: `go fmt ./...`
 4. Check for race conditions: `go test -race ./...`
 5. Benchmark: `go test -bench=. ./...`
+6. End-to-end testing: `./test.sh`
+
+## Important notes for AI agents
+
+Do not modify the end-to-end testing script (`./test.sh`). Only human developers should modify it.
