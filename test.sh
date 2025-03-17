@@ -14,8 +14,6 @@ rm -rf "test/out"
 echo "=== Testing maildir mode ==="
 $calmailproc -maildir test/maildir -store -vdir test/out/vdir1
 
-exit 0
-
 # Loop through storage methods
 for method in "vdir" "icalfile"; do
     echo "=== Testing $method storage ==="
@@ -30,7 +28,7 @@ for method in "vdir" "icalfile"; do
     fi
     
     # Process all example emails
-    for mail in $mail_dir/example-mail-*.eml; do
+    for mail in test/maildir/cur/example-mail-*.eml; do
        # Process the email
         echo
         echo "Processing $mail with $method storage"
