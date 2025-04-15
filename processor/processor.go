@@ -72,9 +72,9 @@ func (p *Processor) ProcessEmail(r io.Reader, jsonOutput bool, storeEvent bool, 
 			if err == nil && existingEvent != nil {
 				// Only update if the sequence number is higher or equal (equal for backward compatibility)
 				if parsedEmail.Event.Sequence < existingEvent.Sequence {
-					fmt.Printf("%s | Event with lower sequence number (%d < %d) | %s | %s\n", 
+					fmt.Printf("%s - Event with lower sequence number (%d < %d) | %s\n", 
 						sourceDescription, parsedEmail.Event.Sequence, existingEvent.Sequence, 
-						parsedEmail.Event.Summary, parsedEmail.Event.UID)
+						parsedEmail.Event.UID)
 				} else {
 					// Store the event with higher/equal sequence
 					if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
@@ -141,11 +141,10 @@ func existingEventSequence(store storage.Storage, uid string) int {
 func outputPlainText(parsedEmail *email.Email) {
 	// Only output if a calendar event was found
 	if parsedEmail.HasCalendar {
-		// Format: source | event summary | event date | sequence | UID
-		fmt.Printf("%s | %s | %s | %d | %s\n", 
+		// Format: source | event summary | sequence | UID
+		fmt.Printf("%s | %s | %d | %s\n", 
 			parsedEmail.SourceDescription,
 			parsedEmail.Event.Summary,
-			parsedEmail.Event.Start.Format("2006-01-02"),
 			parsedEmail.Event.Sequence,
 			parsedEmail.Event.UID)
 	}
