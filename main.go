@@ -53,7 +53,7 @@ func main() {
 			os.Exit(1)
 		}
 		// Open the storage for operations
-		if err := icalStorage.OpenAndLock(); err != nil {
+		if err := icalStorage.ReadAndLockOpen(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error opening icalfile storage: %v\n", err)
 			os.Exit(1)
 		}

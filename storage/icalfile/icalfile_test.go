@@ -29,7 +29,7 @@ func TestICalFileStorage(t *testing.T) {
 	}
 
 	// Open the storage
-	if err := storage.OpenAndLock(); err != nil {
+	if err := storage.ReadAndLockOpen(); err != nil {
 		t.Fatalf("Failed to open storage: %v", err)
 	}
 
@@ -87,7 +87,7 @@ func TestICalFileStorage(t *testing.T) {
 	}
 
 	// Open the storage (should read from file)
-	if err := storage2.OpenAndLock(); err != nil {
+	if err := storage2.ReadAndLockOpen(); err != nil {
 		t.Fatalf("Failed to open second storage: %v", err)
 	}
 
@@ -126,7 +126,7 @@ func TestICalFileStorage(t *testing.T) {
 	}
 
 	// Open the storage (should read from file)
-	if err := storage3.OpenAndLock(); err != nil {
+	if err := storage3.ReadAndLockOpen(); err != nil {
 		t.Fatalf("Failed to open third storage: %v", err)
 	}
 
@@ -166,7 +166,7 @@ func TestConcurrentAccess(t *testing.T) {
 	}
 
 	// Open the storage
-	if err := storage.OpenAndLock(); err != nil {
+	if err := storage.ReadAndLockOpen(); err != nil {
 		t.Fatalf("Failed to open storage: %v", err)
 	}
 
