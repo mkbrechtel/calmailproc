@@ -424,4 +424,3 @@ This is especially helpful for understanding the interfaces and functionality pr
 Do not modify the end-to-end testing script (`./test.sh`). Only human developers should modify it.
 
 After making changes, ensure all tests pass and the application runs smoothly.
-Make a commit but make sure to first create a branch. Do not commit directly to the main branch.
