@@ -14,7 +14,7 @@ func TestParseEmail(t *testing.T) {
 	defer file.Close()
 
 	// Parse the email
-	email, err := Parse(file)
+	email, err := Parse(file, "test-file")
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
@@ -39,6 +39,12 @@ func TestParseEmail(t *testing.T) {
 		t.Errorf("Expected non-zero date")
 	}
 	t.Logf("Email date: %v", email.Date)
+	
+	// Check the source description
+	if email.SourceDescription != "test-file" {
+		t.Errorf("Expected source description 'test-file', got '%s'", email.SourceDescription)
+	}
+	t.Logf("Source description: %s", email.SourceDescription)
 
 	// Check calendar information
 	if !email.HasCalendar {
@@ -60,15 +66,17 @@ func TestParseEmail(t *testing.T) {
 			t.Logf("Event method: %s", email.Event.Method)
 		}
 
-		// TODO: Improve date parsing in the future
-		// For now, we'll skip the exact time check since our simple parser
-		// doesn't handle the complex date formats in the iCalendar yet
+		// Check start and end times (should now be properly parsed)
 		if email.Event.Start.IsZero() {
-			t.Logf("Warning: Start time is zero, will need to improve parsing")
+			t.Errorf("Expected non-zero start time")
+		} else {
+			t.Logf("Event start: %v", email.Event.Start.Format("2006-01-02 15:04:05"))
 		}
 
 		if email.Event.End.IsZero() {
-			t.Logf("Warning: End time is zero, will need to improve parsing")
+			t.Errorf("Expected non-zero end time")
+		} else {
+			t.Logf("Event end: %v", email.Event.End.Format("2006-01-02 15:04:05"))
 		}
 
 		if email.Event.Organizer != "" {
