@@ -12,7 +12,7 @@ rm -rf "test/out"
 
 
 echo "=== Testing maildir mode ==="
-$calmailproc -maildir test/maildir -vdir test/out/vdir1
+$calmailproc -process-replies -maildir test/maildir -vdir test/out/vdir1
 
 # Loop through storage methods
 for method in "vdir" "icalfile"; do
@@ -21,10 +21,10 @@ for method in "vdir" "icalfile"; do
     # Set up args based on method
     if [ "$method" == "vdir" ]; then
         storage_dir="test/out/vdir2"
-        args="-vdir $storage_dir"
+        args="-process-replies -vdir $storage_dir"
     else
         storage_file="test/out/calendar.ics"
-        args="-icalfile $storage_file"
+        args="-process-replies -icalfile $storage_file"
     fi
     
     # Process all example emails

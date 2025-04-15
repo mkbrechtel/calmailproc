@@ -27,7 +27,7 @@ func ParseFlags() *Config {
 	config := &Config{}
 
 	// Define flags
-	flag.BoolVar(&config.ProcessReplies, "process-replies", true, "Process attendance replies to update events")
+	flag.BoolVar(&config.ProcessReplies, "process-replies", false, "Process attendance replies to update events")
 
 	// Storage options
 	flag.StringVar(&config.VdirPath, "vdir", "", "Path to vdir storage directory (overrides default icalfile storage)")
