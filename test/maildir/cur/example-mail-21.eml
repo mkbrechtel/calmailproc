@@ -1,0 +1,47 @@
+Date: Wed, 3 Jun 2020 15:55:44 +0000
+From: EAGxVirtual 2020 <support@tito.io>
+Reply-To: virtual@eaglobalx.org
+To: mkb@thengo.net
+Message-ID: <010201727ae54370-80034f08-4cb1-4f5c-aed3-a3d0f61fccea-000000@eu-west-1.amazonses.com>
+Subject: Your EAGxVirtual 2020 Confirmation, Receipt & Ticket
+Mime-Version: 1.0
+Content-Type: multipart/mixed;
+ boundary="--==_mimepart_5ed7c800c1e6e_105b2ade309112a0263be";
+ charset=UTF-8
+Content-Transfer-Encoding: 7bit
+Tito-Signature: qky8g9uQObsWntqkL8gxabfuy1We/+01sbcI8X6aX+xNJZFkLbVxduPMqlqG=0A0qUjDXhUFAWbF2/+YhWxc64bVM+sbfOpWYfkAqHp5qUQR/tZxsrclaNA+T+j=0AWFXJs/B3HQU9VT8Z24mpw94SrgruSZuPqH+0D4hFzCYk6ufn9ckG4Vh7og98=0AcgquOJJFjdg4wsZRqtNq4eYK9bAkqzLErkvGRRzqsgeCTqJZtcq4kw2iN1re=0Ann7y0E8SXdROxgCtsgolK8OKcYzJOrF7TOy8Lg===0A
+X-SES-Outgoing: 2020.06.03-54.240.3.12
+Feedback-ID: 1.eu-west-1.wxK6+8+39YOV7L51iksIQwJNKa4LqeOpVLuwRJYHtdY=:AmazonSES
+
+
+----==_mimepart_5ed7c800c1e6e_105b2ade309112a0263be
+Content-Type: text/calendar;
+ charset=UTF-8;
+ filename=cea-eagxvirtual2020.ics
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment;
+ filename=cea-eagxvirtual2020.ics
+Content-ID: <5ed7c800d4ca8_105b2ade309112a026658@worker-edinburgh-20200302.mail>
+
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:icalendar-ruby
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+DTSTAMP:20200603T155542Z
+UID:LatiAQ
+DTSTART;VALUE=DATE:20200612T000000
+DTEND;VALUE=DATE:20200615T000000
+CLASS:PUBLIC
+CREATED:20200506T150858
+DESCRIPTION:blank
+LAST-MODIFIED:20200603T155124
+LOCATION:Virtual conference
+ORGANIZER:mailto:virtual@eaglobalx.org
+SUMMARY:EAGxVirtual 2020
+URL:https://ti.to/cea/eagxvirtual2020
+URL;VALUE=URI:https://ti.to/cea/eagxvirtual2020
+END:VEVENT
+END:VCALENDAR
+
+----==_mimepart_5ed7c800c1e6e_105b2ade309112a0263be--
