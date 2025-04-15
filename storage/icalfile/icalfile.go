@@ -171,6 +171,12 @@ func (s *ICalFileStorage) WriteAndUnlock() error {
 			// Extract the VEVENT components
 			for _, component := range eventCal.Children {
 				if component.Name == "VEVENT" {
+					// Check for duplicate URL properties safely
+					if len(component.Props["URL"]) > 1 {
+						fmt.Printf("WARNING: Event with UID %s has multiple URL properties. This may cause errors when encoding.\n",
+							event.UID)
+					}
+
 					cal.Children = append(cal.Children, component)
 				}
 			}
