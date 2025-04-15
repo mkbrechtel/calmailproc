@@ -151,7 +151,7 @@ func TestProcessEmail(t *testing.T) {
 			defer file.Close()
 
 			// Process the email
-			err = proc.ProcessEmail(file, false, true)
+			err = proc.ProcessEmail(file, false, true, tt.emailFile)
 
 			// Check for errors
 			if (err != nil) != tt.wantErr {
@@ -193,7 +193,7 @@ func TestProcessAllEmails(t *testing.T) {
 			t.Fatalf("Failed to open email file %s: %v", filePath, err)
 		}
 
-		err = proc.ProcessEmail(emailFile, false, true)
+		err = proc.ProcessEmail(emailFile, false, true, filePath)
 		emailFile.Close()
 
 		if err != nil {
@@ -232,7 +232,7 @@ func TestProcessRepliesControl(t *testing.T) {
 		t.Fatalf("Failed to open reply file: %v", err)
 	}
 
-	err = procWithReplies.ProcessEmail(replyFile, false, true)
+	err = procWithReplies.ProcessEmail(replyFile, false, true, "../test/maildir/cur/example-mail-12.eml")
 	replyFile.Close()
 	if err != nil {
 		t.Fatalf("Failed to process reply with process-replies=true: %v", err)
@@ -254,7 +254,7 @@ func TestProcessRepliesControl(t *testing.T) {
 		t.Fatalf("Failed to open reply file: %v", err)
 	}
 
-	err = procWithoutReplies.ProcessEmail(replyFile, false, true)
+	err = procWithoutReplies.ProcessEmail(replyFile, false, true, "../test/maildir/cur/example-mail-12.eml")
 	replyFile.Close()
 	if err != nil {
 		t.Fatalf("Failed to process reply with process-replies=false: %v", err)
@@ -280,7 +280,7 @@ func TestRecurringEventSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open original event file: %v", err)
 	}
-	err = proc.ProcessEmail(originalFile, false, true)
+	err = proc.ProcessEmail(originalFile, false, true, "../test/maildir/cur/example-mail-05.eml")
 	originalFile.Close()
 	if err != nil {
 		t.Fatalf("Failed to process original event: %v", err)
@@ -297,7 +297,7 @@ func TestRecurringEventSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open modified event file: %v", err)
 	}
-	err = proc.ProcessEmail(modifiedFile, false, true)
+	err = proc.ProcessEmail(modifiedFile, false, true, "../test/maildir/cur/example-mail-07.eml")
 	modifiedFile.Close()
 	if err != nil {
 		t.Fatalf("Failed to process modified event: %v", err)
@@ -327,7 +327,7 @@ func TestRecurringEventSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open cancelled event file: %v", err)
 	}
-	err = proc.ProcessEmail(cancelFile, false, true)
+	err = proc.ProcessEmail(cancelFile, false, true, "../test/maildir/cur/example-mail-06.eml")
 	cancelFile.Close()
 	if err != nil {
 		t.Fatalf("Failed to process cancelled event: %v", err)
@@ -372,7 +372,7 @@ func TestOutOfOrderEventSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open event file 16: %v", err)
 	}
-	err = proc.ProcessEmail(file16, false, true)
+	err = proc.ProcessEmail(file16, false, true, "../test/maildir/cur/example-mail-16.eml")
 	file16.Close()
 	if err != nil {
 		t.Fatalf("Failed to process event 16: %v", err)
@@ -389,7 +389,7 @@ func TestOutOfOrderEventSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open event file 17: %v", err)
 	}
-	err = proc.ProcessEmail(file17, false, true)
+	err = proc.ProcessEmail(file17, false, true, "../test/maildir/cur/example-mail-17.eml")
 	file17.Close()
 	if err != nil {
 		t.Fatalf("Failed to process event 17: %v", err)
@@ -406,7 +406,7 @@ func TestOutOfOrderEventSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open event file 18: %v", err)
 	}
-	err = proc.ProcessEmail(file18, false, true)
+	err = proc.ProcessEmail(file18, false, true, "../test/maildir/cur/example-mail-18.eml")
 	file18.Close()
 	if err != nil {
 		t.Fatalf("Failed to process event 18: %v", err)
@@ -423,7 +423,7 @@ func TestOutOfOrderEventSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open event file 19: %v", err)
 	}
-	err = proc.ProcessEmail(file19, false, true)
+	err = proc.ProcessEmail(file19, false, true, "../test/maildir/cur/example-mail-19.eml")
 	file19.Close()
 	if err != nil {
 		t.Fatalf("Failed to process event 19: %v", err)
@@ -440,7 +440,7 @@ func TestOutOfOrderEventSequence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open event file 20: %v", err)
 	}
-	err = proc.ProcessEmail(file20, false, true)
+	err = proc.ProcessEmail(file20, false, true, "../test/maildir/cur/example-mail-20.eml")
 	file20.Close()
 	if err != nil {
 		t.Fatalf("Failed to process event 20: %v", err)

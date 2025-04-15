@@ -27,8 +27,8 @@ func NewProcessor(storage storage.Storage, processReplies bool) *Processor {
 
 // ProcessEmail parses an email from an io.Reader and outputs the result
 // based on the specified format (JSON or plain text)
-func (p *Processor) ProcessEmail(r io.Reader, jsonOutput bool, storeEvent bool) error {
-	parsedEmail, err := email.Parse(r)
+func (p *Processor) ProcessEmail(r io.Reader, jsonOutput bool, storeEvent bool, sourceDescription string) error {
+	parsedEmail, err := email.Parse(r, sourceDescription)
 	if err != nil {
 		return fmt.Errorf("parsing email: %w", err)
 	}
@@ -72,8 +72,9 @@ func (p *Processor) ProcessEmail(r io.Reader, jsonOutput bool, storeEvent bool) 
 			if err == nil && existingEvent != nil {
 				// Only update if the sequence number is higher or equal (equal for backward compatibility)
 				if parsedEmail.Event.Sequence < existingEvent.Sequence {
-					fmt.Printf("Ignoring event update with lower sequence number (%d < %d)\n", 
-						parsedEmail.Event.Sequence, existingEvent.Sequence)
+					fmt.Printf("%s | Event with lower sequence number (%d < %d) | %s | %s\n", 
+						sourceDescription, parsedEmail.Event.Sequence, existingEvent.Sequence, 
+						parsedEmail.Event.Summary, parsedEmail.Event.UID)
 				} else {
 					// Store the event with higher/equal sequence
 					if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
@@ -89,10 +90,15 @@ func (p *Processor) ProcessEmail(r io.Reader, jsonOutput bool, storeEvent bool) 
 		}
 	}
 
-	if jsonOutput {
-		outputJSON(parsedEmail)
-	} else {
-		outputPlainText(parsedEmail)
+	// Only output the regular message if this is a calendar event
+	// and it wasn't already reported as having a lower sequence number
+	if parsedEmail.HasCalendar && 
+		!(parsedEmail.Event.Sequence < existingEventSequence(p.Storage, parsedEmail.Event.UID)) {
+		if jsonOutput {
+			outputJSON(parsedEmail)
+		} else {
+			outputPlainText(parsedEmail)
+		}
 	}
 
 	return nil
@@ -121,21 +127,26 @@ func outputJSON(parsedEmail *email.Email) {
 	fmt.Println("\n}")
 }
 
+// existingEventSequence gets the sequence number of an existing event
+// Returns -1 if the event doesn't exist or there's an error
+func existingEventSequence(store storage.Storage, uid string) int {
+	existingEvent, err := store.GetEvent(uid)
+	if err == nil && existingEvent != nil {
+		return existingEvent.Sequence
+	}
+	return -1 // Return -1 if event doesn't exist or there's an error
+}
+
 // outputPlainText prints email information in plain text format
 func outputPlainText(parsedEmail *email.Email) {
-	fmt.Printf("Subject: %s\n", parsedEmail.Subject)
-	fmt.Printf("From: %s\n", parsedEmail.From)
-	fmt.Printf("To: %s\n", parsedEmail.To)
-	fmt.Printf("Date: %s\n", parsedEmail.Date.Format("2006-01-02 15:04:05"))
-
-	// Print calendar information if available
+	// Only output if a calendar event was found
 	if parsedEmail.HasCalendar {
-		fmt.Println("\nCalendar Event:")
-		fmt.Printf("  UID: %s\n", parsedEmail.Event.UID)
-		fmt.Printf("  Summary: %s\n", parsedEmail.Event.Summary)
-		fmt.Printf("  Sequence: %d\n", parsedEmail.Event.Sequence)
-		if parsedEmail.Event.Method != "" {
-			fmt.Printf("  Method: %s\n", parsedEmail.Event.Method)
-		}
+		// Format: source | event summary | event date | sequence | UID
+		fmt.Printf("%s | %s | %s | %d | %s\n", 
+			parsedEmail.SourceDescription,
+			parsedEmail.Event.Summary,
+			parsedEmail.Event.Start.Format("2006-01-02"),
+			parsedEmail.Event.Sequence,
+			parsedEmail.Event.UID)
 	}
 }

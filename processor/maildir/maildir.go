@@ -117,11 +117,12 @@ func processSubfolders(parentDir string, proc *processor.Processor, jsonOutput, 
 			continue
 		}
 
-		// Process the email
-		fmt.Fprintf(os.Stderr, "Processing email: %s\n", filePath)
-		if err := proc.ProcessEmail(f, jsonOutput, storeEvent); err != nil {
+		// Process the email silently
+		if err := proc.ProcessEmail(f, jsonOutput, storeEvent, filePath); err != nil {
 			f.Close()
-			fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
+			if verbose {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
+			}
 			continue
 		}
 
@@ -129,7 +130,7 @@ func processSubfolders(parentDir string, proc *processor.Processor, jsonOutput, 
 		f.Close()
 	}
 
-	if emailsFound > 0 {
+	if verbose && emailsFound > 0 {
 		fmt.Fprintf(os.Stderr, "Processed %d email files directly in directory\n", emailsFound)
 	}
 
@@ -223,12 +224,12 @@ func processMaildirSubdir(dir string, proc *processor.Processor, jsonOutput, sto
 			continue
 		}
 
-		// Process the email
-		fmt.Fprintf(os.Stderr, "Processing email: %s\n", filePath)
-
-		if err := proc.ProcessEmail(f, jsonOutput, storeEvent); err != nil {
+		// Process the email silently 
+		if err := proc.ProcessEmail(f, jsonOutput, storeEvent, filePath); err != nil {
 			f.Close()
-			fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
+			if verbose {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
+			}
 			continue
 		}
 		
@@ -246,12 +247,6 @@ func processMaildirSubdir(dir string, proc *processor.Processor, jsonOutput, sto
 		if unparsedCalendarCount > 0 {
 			fmt.Fprintf(os.Stderr, "Found %d unparseable calendar emails\n", unparsedCalendarCount)
 		}
-	} else if processedCount > 0 {
-		fmt.Fprintf(os.Stderr, " %d/%d processed", processedCount, len(files))
-		if unparsedCalendarCount > 0 {
-			fmt.Fprintf(os.Stderr, " (%d unparseable calendar emails)", unparsedCalendarCount)
-		}
-		fmt.Fprintf(os.Stderr, "\n")
 	}
 
 	return nil

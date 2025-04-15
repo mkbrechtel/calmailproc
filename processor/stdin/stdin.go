@@ -11,7 +11,7 @@ import (
 // Process processes a single email from stdin
 func Process(proc *processor.Processor, jsonOutput, storeEvent bool) error {
 	// Process email from stdin
-	if err := proc.ProcessEmail(os.Stdin, jsonOutput, storeEvent); err != nil {
+	if err := proc.ProcessEmail(os.Stdin, jsonOutput, storeEvent, "stdin"); err != nil {
 		return fmt.Errorf("processing stdin: %w", err)
 	}
 
@@ -22,7 +22,7 @@ func Process(proc *processor.Processor, jsonOutput, storeEvent bool) error {
 // Useful for testing and for cases where the input isn't strictly stdin
 func ProcessReader(r io.Reader, proc *processor.Processor, jsonOutput, storeEvent bool) error {
 	// Process email from reader
-	if err := proc.ProcessEmail(r, jsonOutput, storeEvent); err != nil {
+	if err := proc.ProcessEmail(r, jsonOutput, storeEvent, "reader"); err != nil {
 		return fmt.Errorf("processing email: %w", err)
 	}
 

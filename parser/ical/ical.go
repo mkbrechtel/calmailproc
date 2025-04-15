@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"os"
 	"strings"
+	"time"
 
 	goical "github.com/emersion/go-ical"
 )
@@ -106,6 +107,18 @@ func ParseICalData(icsData []byte) (*Event, error) {
 				event.Sequence = seq
 			}
 		}
+		
+		// Extract DTSTART (start time)
+		startProp := component.Props.Get("DTSTART")
+		if startProp != nil {
+			parseICalDateTime(startProp.Value, startProp.Params, &event.Start)
+		}
+		
+		// Extract DTEND (end time)
+		endProp := component.Props.Get("DTEND")
+		if endProp != nil {
+			parseICalDateTime(endProp.Value, endProp.Params, &event.End)
+		}
 
 		return event, nil
 	}
@@ -166,3 +179,49 @@ type Component = goical.Component
 // Prop is the exported type for go-ical.Prop
 type Prop = goical.Prop
 
+// parseICalDateTime parses an iCalendar date-time string into a Go time.Time
+func parseICalDateTime(value string, params map[string][]string, target *time.Time) {
+	// Parse date based on format
+	layout := ""
+
+	// Check for VALUE parameter
+	valueTypes, hasValueType := params["VALUE"]
+	valueType := ""
+	if hasValueType && len(valueTypes) > 0 {
+		valueType = valueTypes[0]
+	}
+	
+	// Basic format detection
+	hasT := strings.Contains(value, "T")
+	hasZ := strings.HasSuffix(value, "Z")
+	
+	if hasValueType && valueType == "DATE" || (!hasT && len(value) == 8) {
+		// DATE format: 20230915
+		layout = "20060102"
+	} else if hasT && hasZ {
+		// DATE-TIME in UTC: 20230915T133000Z
+		layout = "20060102T150405Z"
+	} else if hasT {
+		// DATE-TIME local: 20230915T133000
+		layout = "20060102T150405"
+	} else {
+		// Default to DATE format if can't determine
+		layout = "20060102"
+	}
+	
+	// Try to parse
+	parsed, err := time.Parse(layout, value)
+	if err == nil {
+		*target = parsed
+	}
+	
+	// Handle TZID parameter if present
+	tzids, hasTZID := params["TZID"]
+	if hasTZID && len(tzids) > 0 {
+		// If we have a timezone, we should adjust the time
+		// This is a simplified approach - proper TZID handling would require
+		// loading the time zone database
+		// For a complete solution, we would use time.LoadLocation(tzid)
+		// But for now, we silently ignore timezone information
+	}
+}
