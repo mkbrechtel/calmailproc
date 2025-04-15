@@ -173,8 +173,11 @@ func (s *ICalFileStorage) WriteAndUnlock() error {
 				if component.Name == "VEVENT" {
 					// Check for duplicate URL properties safely
 					if len(component.Props["URL"]) > 1 {
-						fmt.Printf("WARNING: Event with UID %s has multiple URL properties. This may cause errors when encoding.\n",
+						fmt.Printf("Warning: Event with UID %s has multiple URL properties. This may cause errors when encoding.\n", 
 							event.UID)
+						
+						// Keep only the first URL property to prevent encoding errors
+						component.Props["URL"] = component.Props["URL"][:1]
 					}
 
 					cal.Children = append(cal.Children, component)
