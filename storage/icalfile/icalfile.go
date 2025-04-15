@@ -7,20 +7,25 @@ import (
 	"sync"
 
 	"github.com/mkbrechtel/calmailproc/parser/ical"
+	"github.com/mkbrechtel/calmailproc/storage/memory"
 )
 
 // ICalFileStorage implements the storage.Storage interface using a single iCalendar file
-// Note: In a dumbified implementation, this isn't suitable for production use as it will
-// simply store the latest version of each event, without proper handling of recurring events.
+// It uses memory storage as a backend for improved performance, loading the file only once
+// and writing it back when closed.
 type ICalFileStorage struct {
+	memory.MemoryStorage
 	FilePath string
-	mu       sync.Mutex // Mutex to protect concurrent file access
+	fileLock sync.RWMutex // Lock for file operations
+	isOpen   bool
+	modified bool
 }
 
 // NewICalFileStorage creates a new ICalFileStorage with the given file path
 func NewICalFileStorage(filePath string) (*ICalFileStorage, error) {
 	storage := &ICalFileStorage{
-		FilePath: filePath,
+		MemoryStorage: *memory.NewMemoryStorage(),
+		FilePath:      filePath,
 	}
 
 	// Create the directory if it doesn't exist
@@ -32,164 +37,48 @@ func NewICalFileStorage(filePath string) (*ICalFileStorage, error) {
 	return storage, nil
 }
 
-// StoreEvent stores a calendar event in the icalfile storage
-// This simplified implementation just adds or replaces events in the file
-// without any complex merging or validation logic
-func (s *ICalFileStorage) StoreEvent(event *ical.Event) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// Open loads the ical file into memory storage
+func (s *ICalFileStorage) OpenAndLock() error {
+	s.fileLock.Lock()
+	defer s.fileLock.Unlock()
 
-	if event.UID == "" {
-		return fmt.Errorf("event has no UID")
+	if s.isOpen {
+		return nil // Already open
 	}
 
-	if len(event.RawData) == 0 {
-		return fmt.Errorf("no raw calendar data to store")
-	}
-
-	// Check if file exists and read it
-	var existingCal *ical.Calendar
-	existingData, err := os.ReadFile(s.FilePath)
+	// Check if file exists
+	fileInfo, err := os.Stat(s.FilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// Create a new calendar if the file doesn't exist
-			existingCal = ical.NewCalendar()
-		} else {
-			return fmt.Errorf("reading calendar file: %w", err)
+			// File doesn't exist yet, nothing to load
+			s.isOpen = true
+			return nil
 		}
-	} else {
-		// Parse the existing calendar
-		existingCal, err = ical.DecodeCalendar(existingData)
-		if err != nil {
-			// If we can't parse it, create a new calendar
-			existingCal = ical.NewCalendar()
-		}
+		return fmt.Errorf("checking calendar file: %w", err)
 	}
 
-	// Parse the new event data to extract VEVENT components
-	newCal, err := ical.DecodeCalendar(event.RawData)
-	if err != nil {
-		return fmt.Errorf("parsing new event data: %w", err)
+	// Don't try to read empty files
+	if fileInfo.Size() == 0 {
+		s.isOpen = true
+		return nil
 	}
-
-	// Extract the VEVENT components from the new calendar
-	var newEvents []*ical.Component
-	for _, component := range newCal.Children {
-		if component.Name == "VEVENT" {
-			newEvents = append(newEvents, component)
-		}
-	}
-
-	if len(newEvents) == 0 {
-		return fmt.Errorf("no VEVENT components found in the new calendar data")
-	}
-
-	// For each new event, add it or replace existing one with same UID
-	for _, newEvent := range newEvents {
-		uidProp := newEvent.Props.Get("UID")
-		if uidProp == nil {
-			continue // Skip events without UID
-		}
-
-		// Remove any existing events with the same UID
-		var updatedChildren []*ical.Component
-		for _, component := range existingCal.Children {
-			if component.Name != "VEVENT" {
-				updatedChildren = append(updatedChildren, component)
-				continue
-			}
-
-			existingUID := component.Props.Get("UID")
-			if existingUID == nil || existingUID.Value != uidProp.Value {
-				updatedChildren = append(updatedChildren, component)
-			}
-		}
-
-		// Add the new event
-		updatedChildren = append(updatedChildren, newEvent)
-		existingCal.Children = updatedChildren
-	}
-
-	// Write the updated calendar back to the file
-	updatedData, err := ical.EncodeCalendar(existingCal)
-	if err != nil {
-		return fmt.Errorf("encoding updated calendar: %w", err)
-	}
-
-	if err := os.WriteFile(s.FilePath, updatedData, 0644); err != nil {
-		return fmt.Errorf("writing updated calendar file: %w", err)
-	}
-
-	return nil
-}
-
-// GetEvent retrieves a calendar event from the icalfile storage
-func (s *ICalFileStorage) GetEvent(id string) (*ical.Event, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	// Read the calendar file
 	data, err := os.ReadFile(s.FilePath)
 	if err != nil {
-		return nil, fmt.Errorf("reading calendar file: %w", err)
+		return fmt.Errorf("reading calendar file: %w", err)
 	}
 
 	// Parse the calendar
 	cal, err := ical.DecodeCalendar(data)
 	if err != nil {
-		return nil, fmt.Errorf("parsing calendar file: %w", err)
+		return fmt.Errorf("parsing calendar file: %w", err)
 	}
 
-	// Look for the specified event
-	for _, component := range cal.Children {
-		if component.Name != "VEVENT" {
-			continue
-		}
+	// Clear any existing data in memory storage
+	s.MemoryStorage.Clear()
 
-		uidProp := component.Props.Get("UID")
-		if uidProp != nil && uidProp.Value == id {
-			// Create a minimal calendar containing just this event
-			eventCal := ical.NewCalendar()
-			eventCal.Children = append(eventCal.Children, component)
-
-			// Encode to raw bytes
-			rawData, err := ical.EncodeCalendar(eventCal)
-			if err != nil {
-				return nil, fmt.Errorf("encoding event: %w", err)
-			}
-
-			// Create and return the event
-			event, err := ical.ParseICalData(rawData)
-			if err != nil {
-				return nil, fmt.Errorf("parsing event data: %w", err)
-			}
-
-			return event, nil
-		}
-	}
-
-	return nil, fmt.Errorf("event not found: %s", id)
-}
-
-// ListEvents lists all events in the icalfile storage
-func (s *ICalFileStorage) ListEvents() ([]*ical.Event, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Read the calendar file
-	data, err := os.ReadFile(s.FilePath)
-	if err != nil {
-		return nil, fmt.Errorf("reading calendar file: %w", err)
-	}
-
-	// Parse the calendar
-	cal, err := ical.DecodeCalendar(data)
-	if err != nil {
-		return nil, fmt.Errorf("parsing calendar file: %w", err)
-	}
-
-	// Extract all events
-	var events []*ical.Event
+	// Load all events into memory storage
 	for _, component := range cal.Children {
 		if component.Name != "VEVENT" {
 			continue
@@ -216,62 +105,99 @@ func (s *ICalFileStorage) ListEvents() ([]*ical.Event, error) {
 			continue // Skip events that can't be parsed
 		}
 
-		events = append(events, event)
+		// Store in memory
+		s.MemoryStorage.StoreEvent(event)
 	}
 
-	return events, nil
+	s.isOpen = true
+	s.modified = false
+	return nil
 }
 
-// DeleteEvent deletes a calendar event from the icalfile storage
-func (s *ICalFileStorage) DeleteEvent(id string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+// CloseAndWrite writes the memory storage back to the ical file if modified
+func (s *ICalFileStorage) WriteAndUnlock() error {
+	s.fileLock.Lock()
+	defer s.fileLock.Unlock()
 
-	// Read the calendar file
-	data, err := os.ReadFile(s.FilePath)
-	if err != nil {
-		return fmt.Errorf("reading calendar file: %w", err)
+	if !s.isOpen {
+		return nil // Already closed
 	}
 
-	// Parse the calendar
-	cal, err := ical.DecodeCalendar(data)
-	if err != nil {
-		return fmt.Errorf("parsing calendar file: %w", err)
-	}
-
-	// Filter out the event to delete
-	found := false
-	var updatedChildren []*ical.Component
-	for _, component := range cal.Children {
-		if component.Name != "VEVENT" {
-			updatedChildren = append(updatedChildren, component)
-			continue
+	if s.modified {
+		// Get all events from memory
+		events, err := s.MemoryStorage.ListEvents()
+		if err != nil {
+			return fmt.Errorf("listing events from memory: %w", err)
 		}
 
-		uidProp := component.Props.Get("UID")
-		if uidProp == nil || uidProp.Value != id {
-			updatedChildren = append(updatedChildren, component)
-		} else {
-			found = true
+		// Create a new calendar
+		cal := ical.NewCalendar()
+
+		// Add all events to the calendar
+		for _, event := range events {
+			// Parse the event data to extract VEVENT components
+			eventCal, err := ical.DecodeCalendar(event.RawData)
+			if err != nil {
+				continue // Skip events that can't be decoded
+			}
+
+			// Extract the VEVENT components
+			for _, component := range eventCal.Children {
+				if component.Name == "VEVENT" {
+					cal.Children = append(cal.Children, component)
+				}
+			}
+		}
+
+		// Encode the calendar
+		data, err := ical.EncodeCalendar(cal)
+		if err != nil {
+			return fmt.Errorf("encoding calendar: %w", err)
+		}
+
+		// Write to file
+		if err := os.WriteFile(s.FilePath, data, 0644); err != nil {
+			return fmt.Errorf("writing calendar file: %w", err)
 		}
 	}
 
-	if !found {
-		return fmt.Errorf("event not found: %s", id)
-	}
-
-	// Update the calendar
-	cal.Children = updatedChildren
-
-	// Write the updated calendar back to the file
-	updatedData, err := ical.EncodeCalendar(cal)
-	if err != nil {
-		return fmt.Errorf("encoding updated calendar: %w", err)
-	}
-
-	if err := os.WriteFile(s.FilePath, updatedData, 0644); err != nil {
-		return fmt.Errorf("writing updated calendar file: %w", err)
-	}
-
+	s.isOpen = false
+	s.modified = false
 	return nil
+}
+
+// StoreEvent marks the storage as modified after store operation
+func (s *ICalFileStorage) StoreEvent(event *ical.Event) error {
+	s.fileLock.Lock()
+	defer s.fileLock.Unlock()
+
+	if !s.isOpen {
+		if err := s.OpenAndLock(); err != nil {
+			return err
+		}
+	}
+
+	err := s.MemoryStorage.StoreEvent(event)
+	if err == nil {
+		s.modified = true
+	}
+	return err
+}
+
+// DeleteEvent marks the storage as modified after delete operation
+func (s *ICalFileStorage) DeleteEvent(id string) error {
+	s.fileLock.Lock()
+	defer s.fileLock.Unlock()
+
+	if !s.isOpen {
+		if err := s.OpenAndLock(); err != nil {
+			return err
+		}
+	}
+
+	err := s.MemoryStorage.DeleteEvent(id)
+	if err == nil {
+		s.modified = true
+	}
+	return err
 }
