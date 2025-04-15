@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/mkbrechtel/calmailproc/processor"
 	"github.com/mkbrechtel/calmailproc/processor/maildir"
@@ -35,8 +34,8 @@ func ParseFlags() *Config {
 	flag.BoolVar(&config.ProcessReplies, "process-replies", true, "Process attendance replies to update events")
 
 	// Storage options
-	flag.StringVar(&config.VdirPath, "vdir", "", "Path to vdir storage directory")
-	flag.StringVar(&config.IcalfilePath, "icalfile", "", "Path to single iCalendar file storage")
+	flag.StringVar(&config.VdirPath, "vdir", "", "Path to vdir storage directory (overrides default icalfile storage)")
+	flag.StringVar(&config.IcalfilePath, "icalfile", "", "Path to single iCalendar file storage (default: invitations.ics in current directory)")
 
 	// Input options
 	flag.StringVar(&config.MaildirPath, "maildir", "", "Path to maildir to process (will process all emails recursively)")
@@ -63,7 +62,7 @@ func Run(config *Config) error {
 			return fmt.Errorf("error initializing vdir storage: %w", err)
 		}
 	case config.IcalfilePath != "":
-		// Use icalfile storage if specified
+		// Use specified icalfile storage
 		icalStorage, err = icalfile.NewICalFileStorage(config.IcalfilePath)
 		if err != nil {
 			return fmt.Errorf("error initializing icalfile storage: %w", err)
@@ -80,12 +79,23 @@ func Run(config *Config) error {
 			}
 		}()
 	default:
-		// Default to vdir in user's home directory
-		defaultPath := filepath.Join(os.Getenv("HOME"), ".calendar")
-		store, err = vdir.NewVDirStorage(defaultPath)
+		// Default to using icalfile storage with invitations.ics in current directory
+		defaultPath := "invitations.ics"
+		icalStorage, err = icalfile.NewICalFileStorage(defaultPath)
 		if err != nil {
-			return fmt.Errorf("error initializing default storage: %w", err)
+			return fmt.Errorf("error initializing default icalfile storage: %w", err)
 		}
+		// Open the storage for operations
+		if err := icalStorage.ReadAndLockOpen(); err != nil {
+			return fmt.Errorf("error opening default icalfile storage: %w", err)
+		}
+		store = icalStorage
+		// Make sure to close and write the storage before exiting
+		defer func() {
+			if err := icalStorage.WriteAndUnlock(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error closing default icalfile storage: %v\n", err)
+			}
+		}()
 	}
 
 	// Initialize the processor
