@@ -84,7 +84,7 @@ func Parse(r io.Reader, sourceDescription string) (*Email, error) {
 				event, err := ical.ParseCalendarData(part)
 				if err != nil {
 					// Continue without calendar data if extraction fails
-					fmt.Fprintf(os.Stderr, "Warning: Error extracting calendar data: %v, continuing without calendar\n", err)
+					fmt.Fprintf(os.Stderr, "Warning: Error extracting calendar data: %v, continuing without event\n", err)
 					email.HasCalendar = false
 				} else {
 					email.Event = event
