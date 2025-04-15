@@ -9,7 +9,7 @@ import (
 )
 
 // Process processes all emails in a maildir and its subfolders
-func Process(maildirPath string, proc *processor.Processor, jsonOutput, storeEvent, verbose bool) error {
+func Process(maildirPath string, proc *processor.Processor, verbose bool) error {
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Starting to process maildir: %s\n", maildirPath)
 	}
@@ -33,16 +33,16 @@ func Process(maildirPath string, proc *processor.Processor, jsonOutput, storeEve
 	}
 
 	// Process the current maildir
-	if err := processCurrentMaildir(maildirPath, proc, jsonOutput, storeEvent, verbose); err != nil {
+	if err := processCurrentMaildir(maildirPath, proc, verbose); err != nil {
 		return fmt.Errorf("processing maildir %s: %w", maildirPath, err)
 	}
 
 	// Recursively process subfolders (Thunderbird style)
-	return processSubfolders(maildirPath, proc, jsonOutput, storeEvent, verbose)
+	return processSubfolders(maildirPath, proc, verbose)
 }
 
 // processCurrentMaildir processes emails in the current maildir's new and cur directories
-func processCurrentMaildir(maildirPath string, proc *processor.Processor, jsonOutput, storeEvent, verbose bool) error {
+func processCurrentMaildir(maildirPath string, proc *processor.Processor, verbose bool) error {
 	// Process the 'new' folder first
 	newDir := filepath.Join(maildirPath, "new")
 	if verbose {
@@ -54,7 +54,7 @@ func processCurrentMaildir(maildirPath string, proc *processor.Processor, jsonOu
 			fmt.Fprintf(os.Stderr, "'new' directory does not exist\n")
 		}
 	} else {
-		if err := processMaildirSubdir(newDir, proc, jsonOutput, storeEvent, verbose); err != nil {
+		if err := processMaildirSubdir(newDir, proc, verbose); err != nil {
 			return fmt.Errorf("processing 'new' directory: %w", err)
 		}
 	}
@@ -70,7 +70,7 @@ func processCurrentMaildir(maildirPath string, proc *processor.Processor, jsonOu
 			fmt.Fprintf(os.Stderr, "'cur' directory does not exist\n")
 		}
 	} else {
-		if err := processMaildirSubdir(curDir, proc, jsonOutput, storeEvent, verbose); err != nil {
+		if err := processMaildirSubdir(curDir, proc, verbose); err != nil {
 			return fmt.Errorf("processing 'cur' directory: %w", err)
 		}
 	}
@@ -79,7 +79,7 @@ func processCurrentMaildir(maildirPath string, proc *processor.Processor, jsonOu
 }
 
 // processSubfolders recursively processes subfolders in Thunderbird style
-func processSubfolders(parentDir string, proc *processor.Processor, jsonOutput, storeEvent, verbose bool) error {
+func processSubfolders(parentDir string, proc *processor.Processor, verbose bool) error {
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Looking for subfolders in: %s\n", parentDir)
 	}
@@ -118,7 +118,7 @@ func processSubfolders(parentDir string, proc *processor.Processor, jsonOutput, 
 		}
 
 		// Process the email silently
-		if err := proc.ProcessEmail(f, jsonOutput, storeEvent, filePath); err != nil {
+		if err := proc.ProcessEmail(f, filePath); err != nil {
 			f.Close()
 			if verbose {
 				fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
@@ -171,7 +171,7 @@ func processSubfolders(parentDir string, proc *processor.Processor, jsonOutput, 
 				fmt.Fprintf(os.Stderr, "Processing maildir subfolder: %s (has cur: %t, has new: %t)\n",
 					subPath, hasCur, hasNew)
 			}
-			if err := processCurrentMaildir(subPath, proc, jsonOutput, storeEvent, verbose); err != nil {
+			if err := processCurrentMaildir(subPath, proc, verbose); err != nil {
 				if verbose {
 					fmt.Fprintf(os.Stderr, "Warning: Error processing maildir %s: %v\n", subPath, err)
 				}
@@ -181,7 +181,7 @@ func processSubfolders(parentDir string, proc *processor.Processor, jsonOutput, 
 		}
 
 		// Recursively process subfolders (even if not a standard maildir)
-		if err := processSubfolders(subPath, proc, jsonOutput, storeEvent, verbose); err != nil {
+		if err := processSubfolders(subPath, proc, verbose); err != nil {
 			if verbose {
 				fmt.Fprintf(os.Stderr, "Warning: Error processing subfolders of %s: %v\n", subPath, err)
 			}
@@ -192,7 +192,7 @@ func processSubfolders(parentDir string, proc *processor.Processor, jsonOutput, 
 }
 
 // processMaildirSubdir processes all email files in a maildir subdirectory
-func processMaildirSubdir(dir string, proc *processor.Processor, jsonOutput, storeEvent, verbose bool) error {
+func processMaildirSubdir(dir string, proc *processor.Processor, verbose bool) error {
 	// Check if directory exists
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		return nil // Skip if directory doesn't exist
@@ -225,7 +225,7 @@ func processMaildirSubdir(dir string, proc *processor.Processor, jsonOutput, sto
 		}
 
 		// Process the email silently 
-		if err := proc.ProcessEmail(f, jsonOutput, storeEvent, filePath); err != nil {
+		if err := proc.ProcessEmail(f, filePath); err != nil {
 			f.Close()
 			if verbose {
 				fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)

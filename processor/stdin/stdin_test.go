@@ -28,7 +28,7 @@ func TestProcessReader(t *testing.T) {
 	emailReader := bytes.NewReader(emailBytes)
 	
 	// Process the email
-	err = ProcessReader(emailReader, proc, false, true)
+	err = ProcessReader(emailReader, proc)
 	if err != nil {
 		t.Fatalf("ProcessReader failed: %v", err)
 	}

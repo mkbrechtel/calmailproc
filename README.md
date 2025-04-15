@@ -25,7 +25,6 @@ STATUS: WIP with major issues still.
   
 - **Output Options**:
   - Plain text output showing event details
-  - JSON output for integration with other tools
   - Configurable verbosity levels for debugging
   
 ## Installation
@@ -55,27 +54,21 @@ go install github.com/mkbrechtel/calmailproc@latest
 # Process an email file and display information in plain text
 cat email.eml | calmailproc
 
-# Process and store the calendar event
-cat email.eml | calmailproc -store
-
-# Process and output in JSON format
-cat email.eml | calmailproc -json
-
 # Specify storage location (vdir format)
-cat email.eml | calmailproc -store -vdir ~/.calendar/events
+cat email.eml | calmailproc -vdir ~/.calendar/events
 ```
 
 ### Process a maildir
 
 ```bash
 # Process all emails in a maildir (recursively)
-calmailproc -maildir ~/Mail/MyFolder -store
+calmailproc -maildir ~/Mail/MyFolder
 
 # With verbose output
-calmailproc -maildir ~/Mail/MyFolder -store -verbose
+calmailproc -maildir ~/Mail/MyFolder -verbose
 
 # Using a specific storage location
-calmailproc -maildir ~/Mail/MyFolder -store -vdir ~/.calendar/invitations
+calmailproc -maildir ~/Mail/MyFolder -vdir ~/.calendar/invitations
 ```
 
 ### Command Line Options
@@ -84,14 +77,10 @@ calmailproc -maildir ~/Mail/MyFolder -store -vdir ~/.calendar/invitations
 Usage of calmailproc:
   -icalfile string
         Path to single iCalendar file storage
-  -json
-        Output in JSON format
   -maildir string
         Path to maildir to process (will process all emails recursively)
   -process-replies
         Process attendance replies to update events (default true)
-  -store
-        Store calendar event if found
   -vdir string
         Path to vdir storage directory
   -verbose
@@ -106,7 +95,7 @@ The tool is designed to be used in standard Unix mail pipelines. For example:
 # Process incoming mail with procmail
 :0c
 * ^Content-Type:.*text/calendar
-| calmailproc -store -vdir ~/.calendar/invitations > /path/to/logs/calendar.log
+| calmailproc -vdir ~/.calendar/invitations > /path/to/logs/calendar.log
 ```
 
 ## Storage Formats

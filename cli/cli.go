@@ -15,8 +15,6 @@ import (
 
 // Config contains all the CLI configuration options
 type Config struct {
-	JsonOutput    bool
-	StoreEvent    bool
 	ProcessReplies bool
 	VdirPath      string
 	IcalfilePath  string
@@ -29,8 +27,6 @@ func ParseFlags() *Config {
 	config := &Config{}
 
 	// Define flags
-	flag.BoolVar(&config.JsonOutput, "json", false, "Output in JSON format")
-	flag.BoolVar(&config.StoreEvent, "store", false, "Store calendar event if found")
 	flag.BoolVar(&config.ProcessReplies, "process-replies", true, "Process attendance replies to update events")
 
 	// Storage options
@@ -103,14 +99,14 @@ func Run(config *Config) error {
 
 	// Process maildir if specified
 	if config.MaildirPath != "" {
-		if err := maildir.Process(config.MaildirPath, proc, config.JsonOutput, config.StoreEvent, config.Verbose); err != nil {
+		if err := maildir.Process(config.MaildirPath, proc, config.Verbose); err != nil {
 			return fmt.Errorf("error processing maildir: %w", err)
 		}
 		return nil
 	}
 
 	// Default: process from stdin
-	if err := stdin.Process(proc, config.JsonOutput, config.StoreEvent); err != nil {
+	if err := stdin.Process(proc); err != nil {
 		return fmt.Errorf("error processing stdin: %w", err)
 	}
 	

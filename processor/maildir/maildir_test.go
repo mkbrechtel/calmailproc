@@ -14,7 +14,7 @@ func TestProcess_InvalidPath(t *testing.T) {
 	proc := processor.NewProcessor(store, true)
 
 	// Test with a non-existent path
-	err := Process("/path/that/does/not/exist", proc, false, false, false)
+	err := Process("/path/that/does/not/exist", proc, false)
 	if err == nil {
 		t.Errorf("Expected error for non-existent path, but got nil")
 	}
@@ -34,7 +34,7 @@ func TestProcess_ExistingMaildir(t *testing.T) {
 	proc := processor.NewProcessor(store, true)
 
 	// Process the test maildir
-	err := Process(testMaildir, proc, false, true, false)
+	err := Process(testMaildir, proc, false)
 	if err != nil {
 		t.Errorf("Expected no error processing test maildir, but got: %v", err)
 	}
@@ -58,8 +58,8 @@ func TestProcess_MalformedEmails(t *testing.T) {
 	store := memory.NewMemoryStorage()
 	proc := processor.NewProcessor(store, true)
 	
-	// Process the test maildir with the store flag to ensure we attempt to store calendar events
-	err := Process(testMaildir, proc, false, true, true) // Verbose mode to see outputs
+	// Process the test maildir with verbose mode to see outputs
+	err := Process(testMaildir, proc, true) 
 	if err != nil {
 		t.Errorf("Expected no error processing maildir with malformed emails, but got: %v", err)
 	}

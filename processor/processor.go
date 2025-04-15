@@ -25,16 +25,15 @@ func NewProcessor(storage storage.Storage, processReplies bool) *Processor {
 	}
 }
 
-// ProcessEmail parses an email from an io.Reader and outputs the result
-// based on the specified format (JSON or plain text)
-func (p *Processor) ProcessEmail(r io.Reader, jsonOutput bool, storeEvent bool, sourceDescription string) error {
+// ProcessEmail parses an email from an io.Reader and outputs the result in plain text
+func (p *Processor) ProcessEmail(r io.Reader, sourceDescription string) error {
 	parsedEmail, err := email.Parse(r, sourceDescription)
 	if err != nil {
 		return fmt.Errorf("parsing email: %w", err)
 	}
 
-	// Process the calendar event if one was found
-	if storeEvent && parsedEmail.HasCalendar && parsedEmail.Event.UID != "" {
+	// Process the calendar event if one was found (always store if it has a valid UID)
+	if parsedEmail.HasCalendar && parsedEmail.Event.UID != "" {
 		// Check if this is a METHOD:REPLY
 		if parsedEmail.Event.Method == "REPLY" {
 			if !p.ProcessReplies {
@@ -94,38 +93,12 @@ func (p *Processor) ProcessEmail(r io.Reader, jsonOutput bool, storeEvent bool, 
 	// and it wasn't already reported as having a lower sequence number
 	if parsedEmail.HasCalendar && 
 		!(parsedEmail.Event.Sequence < existingEventSequence(p.Storage, parsedEmail.Event.UID)) {
-		if jsonOutput {
-			outputJSON(parsedEmail)
-		} else {
-			outputPlainText(parsedEmail)
-		}
+		outputPlainText(parsedEmail)
 	}
 
 	return nil
 }
 
-// outputJSON prints email information in JSON format
-func outputJSON(parsedEmail *email.Email) {
-	fmt.Println("{")
-	fmt.Printf("  \"subject\": %q,\n", parsedEmail.Subject)
-	fmt.Printf("  \"from\": %q,\n", parsedEmail.From)
-	fmt.Printf("  \"to\": %q,\n", parsedEmail.To)
-	fmt.Printf("  \"date\": %q,\n", parsedEmail.Date.Format("2006-01-02T15:04:05Z07:00"))
-	fmt.Printf("  \"has_calendar\": %t", parsedEmail.HasCalendar)
-
-	if parsedEmail.HasCalendar {
-		fmt.Printf(",\n  \"event\": {\n")
-		fmt.Printf("    \"uid\": %q,\n", parsedEmail.Event.UID)
-		fmt.Printf("    \"summary\": %q,\n", parsedEmail.Event.Summary)
-		fmt.Printf("    \"sequence\": %d", parsedEmail.Event.Sequence)
-		if parsedEmail.Event.Method != "" {
-			fmt.Printf(",\n    \"method\": %q", parsedEmail.Event.Method)
-		}
-		fmt.Printf("\n  }")
-	}
-
-	fmt.Println("\n}")
-}
 
 // existingEventSequence gets the sequence number of an existing event
 // Returns -1 if the event doesn't exist or there's an error
