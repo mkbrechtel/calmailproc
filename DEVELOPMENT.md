@@ -399,6 +399,26 @@ Error handling is crucial for a reliable application. Follow these principles:
 5. Benchmark: `go test -bench=. ./...`
 6. End-to-end testing: `./test.sh`
 
+## Documentation
+
+For better understanding of the libraries used in this project, you can use Go's built-in documentation tool:
+
+```bash
+# View documentation for a specific package
+go doc github.com/emersion/go-ical
+
+# View documentation for a specific function/type
+go doc github.com/emersion/go-ical.Calendar
+
+# View documentation for a standard library package
+go doc fmt
+
+# View documentation for a specific function in the standard library
+go doc fmt.Printf
+```
+
+This is especially helpful for understanding the interfaces and functionality provided by third-party libraries like go-ical, as well as standard library packages used throughout the codebase.
+
 ## Important notes for AI agents
 
 Do not modify the end-to-end testing script (`./test.sh`). Only human developers should modify it.
