@@ -6,7 +6,6 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/mail"
-	"os"
 	"strings"
 	"time"
 
@@ -59,30 +58,31 @@ func Parse(r io.Reader) (*Email, error) {
 		transferEncoding := msg.Header.Get("Content-Transfer-Encoding")
 		event, err := ical.ParseCalendarReader(msg.Body, transferEncoding)
 		if err != nil {
-			// Continue without calendar data if extraction fails
-			fmt.Fprintf(os.Stderr, "Warning: Error extracting calendar data: %v, continuing without event\n", err)
 			email.HasCalendar = false
-		} else {
-			email.Event = event
+			return email, fmt.Errorf("extracting calendar data: %w", err)
 		}
+		email.Event = event
 	} else if strings.HasPrefix(mediaType, "multipart/") {
 		// Handle multipart message
 		boundary := params["boundary"]
 		if boundary == "" {
 			// Continue processing without multipart if boundary is missing
-			fmt.Fprintf(os.Stderr, "Warning: No boundary found for multipart message, continuing with basic text\n")
-			return email, nil
+			return email, fmt.Errorf("no boundary found for multipart message")
 		}
 
 		// Process the multipart message recursively to handle nested multiparts
-		email = processMultipart(msg.Body, boundary, email)
+		var err error
+		email, err = processMultipart(msg.Body, boundary, email)
+		if err != nil {
+			return email, fmt.Errorf("processing multipart: %w", err)
+		}
 	}
 
 	return email, nil
 }
 
 // processMultipart processes a multipart message part and recursively processes nested multiparts
-func processMultipart(r io.Reader, boundary string, email *Email) *Email {
+func processMultipart(r io.Reader, boundary string, email *Email) (*Email, error) {
 	mr := multipart.NewReader(r, boundary)
 	
 	for {
@@ -91,9 +91,7 @@ func processMultipart(r io.Reader, boundary string, email *Email) *Email {
 			break
 		}
 		if err != nil {
-			// Continue processing if one part fails
-			fmt.Fprintf(os.Stderr, "Warning: Error reading multipart: %v, continuing with parsed parts\n", err)
-			break
+			return email, fmt.Errorf("error reading multipart: %w", err)
 		}
 
 		// Get the part's content type
@@ -122,12 +120,10 @@ func processMultipart(r io.Reader, boundary string, email *Email) *Email {
 			email.HasCalendar = true
 			event, err := ical.ParseCalendarData(part)
 			if err != nil {
-				// Continue without calendar data if extraction fails
-				fmt.Fprintf(os.Stderr, "Warning: Error extracting calendar data: %v, continuing without event\n", err)
 				email.HasCalendar = false
-			} else {
-				email.Event = event
+				return email, fmt.Errorf("extracting calendar data: %w", err)
 			}
+			email.Event = event
 			// Continue processing other parts in case there are multiple calendar entries
 		} else if strings.HasPrefix(mediaType, "multipart/") {
 			// Process nested multipart content recursively
@@ -136,15 +132,18 @@ func processMultipart(r io.Reader, boundary string, email *Email) *Email {
 				// Create a copy of the part data
 				partData, err := io.ReadAll(part)
 				if err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: Error reading nested multipart data: %v\n", err)
-					continue
+					return email, fmt.Errorf("reading nested multipart data: %w", err)
 				}
 				
 				// Process the nested multipart
-				email = processMultipart(strings.NewReader(string(partData)), nestedBoundary, email)
+				var nestedErr error
+				email, nestedErr = processMultipart(strings.NewReader(string(partData)), nestedBoundary, email)
+				if nestedErr != nil {
+					return email, fmt.Errorf("processing nested multipart: %w", nestedErr)
+				}
 			}
 		}
 	}
 
-	return email
+	return email, nil
 }

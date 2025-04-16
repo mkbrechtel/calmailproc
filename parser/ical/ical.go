@@ -80,7 +80,6 @@ func ParseICalData(icsData []byte) (*Event, error) {
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "Warning: Panic in iCal decoder: %v\n", r)
 				err = fmt.Errorf("panic in decoder: %v", r)
 			}
 		}()
