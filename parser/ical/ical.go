@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	"os"
 	"strings"
 
 	goical "github.com/emersion/go-ical"
@@ -76,17 +75,17 @@ func ParseICalData(icsData []byte) (*Event, error) {
 	// Use a defer-recover to handle any panics in the decoder
 	var cal *goical.Calendar
 	var err error
-
+	
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
 				err = fmt.Errorf("panic in decoder: %v", r)
 			}
 		}()
-
+		
 		cal, err = goical.NewDecoder(bytes.NewReader(icsData)).Decode()
 	}()
-
+	
 	if err != nil {
 		return nil, fmt.Errorf("parsing iCal data: %w", err)
 	}
@@ -144,24 +143,23 @@ func ParseICalData(icsData []byte) (*Event, error) {
 
 // DecodeCalendar parses iCalendar data into a Calendar object
 func DecodeCalendar(icsData []byte) (*goical.Calendar, error) {
+	// Use a defer-recover to handle any panics in the decoder
 	var cal *goical.Calendar
 	var err error
-
+	
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				fmt.Fprintf(os.Stderr, "Warning: Panic in iCal decoder: %v\n", r)
 				err = fmt.Errorf("panic in decoder: %v", r)
 			}
 		}()
-
+		
 		cal, err = goical.NewDecoder(bytes.NewReader(icsData)).Decode()
 	}()
-
+	
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding iCal data: %w", err)
 	}
-
 	return cal, nil
 }
 
