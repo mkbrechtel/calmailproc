@@ -14,7 +14,7 @@ func TestParseEmail(t *testing.T) {
 	defer file.Close()
 
 	// Parse the email
-	email, err := Parse(file, "test-file")
+	email, err := Parse(file)
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}

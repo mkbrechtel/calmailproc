@@ -21,11 +21,10 @@ type Email struct {
 	Date              time.Time
 	HasCalendar       bool
 	Event             *ical.Event
-	SourceDescription string // Description of the email source (filename, stdin, etc.)
 }
 
 // Parse parses an email from an io.Reader and extracts calendar data if present
-func Parse(r io.Reader, sourceDescription string) (*Email, error) {
+func Parse(r io.Reader) (*Email, error) {
 	// Use Go's standard mail package to parse the email
 	msg, err := mail.ReadMessage(r)
 	if err != nil {
@@ -37,7 +36,6 @@ func Parse(r io.Reader, sourceDescription string) (*Email, error) {
 		Subject:           msg.Header.Get("Subject"),
 		From:              msg.Header.Get("From"),
 		To:                msg.Header.Get("To"),
-		SourceDescription: sourceDescription,
 	}
 
 	// Parse the date

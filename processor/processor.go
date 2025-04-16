@@ -17,7 +17,6 @@ type Processor struct {
 	ProcessReplies bool // Whether to process METHOD:REPLY to update attendee status
 }
 
-// NewProcessor creates a new processor with the given storage
 func NewProcessor(storage storage.Storage, processReplies bool) *Processor {
 	return &Processor{
 		Storage:        storage,
@@ -25,81 +24,29 @@ func NewProcessor(storage storage.Storage, processReplies bool) *Processor {
 	}
 }
 
-// ProcessEmail parses an email from an io.Reader and outputs the result in plain text
-func (p *Processor) ProcessEmail(r io.Reader, sourceDescription string) error {
-	parsedEmail, err := email.Parse(r, sourceDescription)
+func (p *Processor) ProcessEmail(r io.Reader) (string, error) {
+	parsedEmail, err := email.Parse(r)
 	if err != nil {
-		return fmt.Errorf("parsing email: %w", err)
+		return "E-Mail parsing error", fmt.Errorf("parsing email: %w", err)
 	}
 
 	// Process the calendar event if one was found (always store if it has a valid UID)
 	if parsedEmail.HasCalendar && parsedEmail.Event.UID != "" {
-		// Check if this is a METHOD:REPLY
-		if parsedEmail.Event.Method == "REPLY" {
-			if !p.ProcessReplies {
-				// Skip storing REPLY events when ProcessReplies is false
-				fmt.Println("Ignoring calendar REPLY method as configured")
-			} else {
-				// Try to find the existing event to update attendee status
-				existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
-				if err == nil && existingEvent != nil {
-					// Process the reply to update attendee status
-					if err := p.updateAttendeeStatus(parsedEmail.Event, existingEvent); err != nil {
-						fmt.Printf("Warning: Failed to update attendee status: %v\n", err)
-						
-						// If attendee update fails, store the event normally
-						if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
-							return fmt.Errorf("storing event: %w", err)
-						}
-					} else {
-						// Store the updated event
-						if err := p.Storage.StoreEvent(existingEvent); err != nil {
-							return fmt.Errorf("storing updated event: %w", err)
-						}
-					}
-				} else {
-					// No existing event found, store the new one
-					if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
-						return fmt.Errorf("storing event: %w", err)
-					}
-				}
+		// Check if this is a METHOD:REQUEST or METHOD:CANCEL
+		if parsedEmail.Event.Method == "REQUEST" {
+			if err := p.processEventRequest(parsedEmail); err != nil {
+				return "", err
+			}
+		} else if parsedEmail.Event.Method == "CANCEL" {
+			if err := p.processEventCancelation(parsedEmail); err != nil {
+				return "", err
+			}
+		} else if parsedEmail.Event.Method == "REPLY" {
+			if err := p.processEventReply(parsedEmail); err != nil {
+				return "", err
 			}
 		} else {
-			// For non-REPLY methods
-			// Check for existing event with the same UID
-			existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
-			if err == nil && existingEvent != nil {
-				// Only update if the sequence number is higher or equal (equal for backward compatibility)
-				if parsedEmail.Event.Sequence < existingEvent.Sequence {
-					fmt.Printf("%s - Event with lower sequence number (%d < %d) | %s\n", 
-						sourceDescription, parsedEmail.Event.Sequence, existingEvent.Sequence, 
-						parsedEmail.Event.UID)
-				} else {
-					// Check if this is a recurring event update
-					if p.isRecurringUpdate(parsedEmail.Event) {
-						// Handle recurring event update
-						updatedEvent, err := p.handleRecurringEvent(existingEvent, parsedEmail.Event)
-						if err != nil {
-							return fmt.Errorf("handling recurring event: %w", err)
-						}
-						
-						// Store the updated event
-						if err := p.Storage.StoreEvent(updatedEvent); err != nil {
-							return fmt.Errorf("storing updated event: %w", err)
-						}
-					} else {
-						// Store the event with higher/equal sequence
-						if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
-							return fmt.Errorf("storing event: %w", err)
-						}
-					}
-				}
-			} else {
-				// No existing event found, store the new one
-				if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
-					return fmt.Errorf("storing event: %w", err)
-				}
-			}
+			return "", fmt.Errorf("unsupported calendar method: %s", parsedEmail.Event.Method)
 		}
 	}
 
@@ -110,29 +57,98 @@ func (p *Processor) ProcessEmail(r io.Reader, sourceDescription string) error {
 		outputPlainText(parsedEmail)
 	}
 
-	return nil
+	return "Successfully processed email", nil
 }
 
-// isRecurringUpdate checks if an event is a recurring event update
-func (p *Processor) isRecurringUpdate(event *ical.Event) bool {
-	// Parse the event data
-	cal, err := ical.DecodeCalendar(event.RawData)
-	if err != nil {
-		return false
+// processEventRequest handles calendar events with METHOD:REQUEST
+func (p *Processor) processEventRequest(parsedEmail *email.Email) (string, error) {
+	// Check for existing event with the same UID
+	existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
+	if err == nil && existingEvent != nil {
+		// Only update if the sequence number is higher or equal (equal for backward compatibility)
+		if parsedEmail.Event.Sequence < existingEvent.Sequence {
+			return fmt.Sprintf("Not processing event with lower sequence number (%d < %d) with UID %s", 
+				parsedEmail.Event.Sequence, existingEvent.Sequence, 
+				parsedEmail.Event.UID), nil
+		} else {
+			// Check if this is a recurring event update
+			if parsedEmail.Event.IsRecurringUpdate() {
+				// Handle recurring event update
+				updatedEvent, err := p.handleRecurringEvent(existingEvent, parsedEmail.Event)
+				if err != nil {
+					return "Error handling recurring event", fmt.Errorf("handling recurring event: %w", err)
+				}
+
+				// Store the updated event
+				if err := p.Storage.StoreEvent(updatedEvent); err != nil {
+					return "Error storing updated event", fmt.Errorf("storing updated event: %w", err)
+				}
+
+				return fmt.Sprintf("Updated recurring event instance with UID %s", parsedEmail.Event.UID), nil
+			} else {
+				// Store the event with higher/equal sequence
+				if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
+					return "Error storing event", fmt.Errorf("storing event: %w", err)
+				}
+
+				return fmt.Sprintf("Updated event with UID %s, new sequence: %d", 
+					parsedEmail.Event.UID, parsedEmail.Event.Sequence), nil
+			}
+		}
+	} else {
+		// No existing event found, store the new one
+		if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
+			return "Error storing new event", fmt.Errorf("storing event: %w", err)
+		}
+
+		return fmt.Sprintf("Stored new event with UID %s", parsedEmail.Event.UID), nil
+	}
+}
+
+// processEventCancelation handles calendar events with METHOD:CANCEL
+func (p *Processor) processEventCancelation(parsedEmail *email.Email) (string, error) {
+	// For now, just use the same logic as for REQUEST
+	return p.processEventRequest(parsedEmail)
+}
+
+// processEventReply handles calendar events with METHOD:REPLY
+func (p *Processor) processEventReply(parsedEmail *email.Email) (string, error) {
+	if !p.ProcessReplies {
+		// Skip storing REPLY events when ProcessReplies is false
+		return "Ignoring calendar REPLY method as configured", nil
 	}
 
-	// Check for RECURRENCE-ID in VEVENT components
-	for _, component := range cal.Children {
-		if component.Name != "VEVENT" {
-			continue
+	// Try to find the existing event to update attendee status
+	existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
+	if err == nil && existingEvent != nil {
+		// Process the reply to update attendee status
+		if err := p.updateAttendeeStatus(parsedEmail.Event, existingEvent); err != nil {
+			fmt.Printf("Warning: Failed to update attendee status: %v\n", err)
+
+			// If attendee update fails, store the event normally
+			if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
+				return "Error storing reply event", fmt.Errorf("storing event: %w", err)
+			}
+
+			return fmt.Sprintf("Stored reply event with UID %s (attendee update failed)", 
+				parsedEmail.Event.UID), nil
+		} else {
+			// Store the updated event
+			if err := p.Storage.StoreEvent(existingEvent); err != nil {
+				return "Error storing updated event with attendee status", fmt.Errorf("storing updated event: %w", err)
+			}
+
+			return fmt.Sprintf("Updated attendee status for event with UID %s", 
+				parsedEmail.Event.UID), nil
 		}
-		
-		if component.Props.Get("RECURRENCE-ID") != nil {
-			return true
+	} else {
+		// No existing event found, store the new one
+		if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
+			return "Error storing new reply event", fmt.Errorf("storing event: %w", err)
 		}
+
+		return fmt.Sprintf("Stored new reply event with UID %s", parsedEmail.Event.UID), nil
 	}
-	
-	return false
 }
 
 // handleRecurringEvent merges a recurring event update with the existing event
