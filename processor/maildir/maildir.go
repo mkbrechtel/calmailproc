@@ -20,12 +20,12 @@ func Process(maildirPath string, proc *processor.Processor, verbose bool) error 
 	}
 
 	// List contents of the directory for debugging
-	entries, err := os.ReadDir(maildirPath)
-	if err != nil {
-		return fmt.Errorf("reading maildir: %w", err)
-	}
-
 	if verbose {
+		entries, err := os.ReadDir(maildirPath)
+		if err != nil {
+			return fmt.Errorf("reading maildir: %w", err)
+		}
+
 		fmt.Fprintf(os.Stderr, "Found %d entries in maildir root\n", len(entries))
 		for _, entry := range entries {
 			fmt.Fprintf(os.Stderr, "  - %s (dir: %t)\n", entry.Name(), entry.IsDir())
@@ -33,53 +33,123 @@ func Process(maildirPath string, proc *processor.Processor, verbose bool) error 
 	}
 
 	// Process the current maildir
-	if err := processCurrentMaildir(maildirPath, proc, verbose); err != nil {
+	if err := processMaildirDirectory(maildirPath, proc, verbose); err != nil {
 		return fmt.Errorf("processing maildir %s: %w", maildirPath, err)
-	}
-
-	// Recursively process subfolders (Thunderbird style)
-	return processSubfolders(maildirPath, proc, verbose)
-}
-
-// processCurrentMaildir processes emails in the current maildir's new and cur directories
-func processCurrentMaildir(maildirPath string, proc *processor.Processor, verbose bool) error {
-	// Process the 'new' folder first
-	newDir := filepath.Join(maildirPath, "new")
-	if verbose {
-		fmt.Fprintf(os.Stderr, "Checking for 'new' directory: %s\n", newDir)
-	}
-
-	if _, err := os.Stat(newDir); os.IsNotExist(err) {
-		if verbose {
-			fmt.Fprintf(os.Stderr, "'new' directory does not exist\n")
-		}
-	} else {
-		if err := processMaildirSubdir(newDir, proc, verbose); err != nil {
-			return fmt.Errorf("processing 'new' directory: %w", err)
-		}
-	}
-
-	// Then process the 'cur' folder
-	curDir := filepath.Join(maildirPath, "cur")
-	if verbose {
-		fmt.Fprintf(os.Stderr, "Checking for 'cur' directory: %s\n", curDir)
-	}
-
-	if _, err := os.Stat(curDir); os.IsNotExist(err) {
-		if verbose {
-			fmt.Fprintf(os.Stderr, "'cur' directory does not exist\n")
-		}
-	} else {
-		if err := processMaildirSubdir(curDir, proc, verbose); err != nil {
-			return fmt.Errorf("processing 'cur' directory: %w", err)
-		}
 	}
 
 	return nil
 }
 
-// processSubfolders recursively processes subfolders in Thunderbird style
-func processSubfolders(parentDir string, proc *processor.Processor, verbose bool) error {
+// processMaildirDirectory processes a maildir directory and all its subfolders
+func processMaildirDirectory(dirPath string, proc *processor.Processor, verbose bool) error {
+	// Process the standard maildir folders (new and cur)
+	if err := processStandardMaildirFolders(dirPath, proc, verbose); err != nil {
+		return err
+	}
+
+	// Process emails directly in this directory (some implementations do this)
+	if err := processEmailsInDirectory(dirPath, proc, verbose); err != nil {
+		return err
+	}
+
+	// Process subdirectories recursively
+	return processSubdirectories(dirPath, proc, verbose)
+}
+
+// processStandardMaildirFolders processes the standard 'new' and 'cur' folders of a maildir
+func processStandardMaildirFolders(maildirPath string, proc *processor.Processor, verbose bool) error {
+	// Process the 'new' folder if it exists
+	newDir := filepath.Join(maildirPath, "new")
+	if _, err := os.Stat(newDir); err == nil {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "Processing 'new' directory: %s\n", newDir)
+		}
+		if err := processEmailsInDirectory(newDir, proc, verbose); err != nil {
+			return fmt.Errorf("processing 'new' directory: %w", err)
+		}
+	} else if verbose {
+		fmt.Fprintf(os.Stderr, "'new' directory does not exist: %s\n", newDir)
+	}
+
+	// Process the 'cur' folder if it exists
+	curDir := filepath.Join(maildirPath, "cur")
+	if _, err := os.Stat(curDir); err == nil {
+		if verbose {
+			fmt.Fprintf(os.Stderr, "Processing 'cur' directory: %s\n", curDir)
+		}
+		if err := processEmailsInDirectory(curDir, proc, verbose); err != nil {
+			return fmt.Errorf("processing 'cur' directory: %w", err)
+		}
+	} else if verbose {
+		fmt.Fprintf(os.Stderr, "'cur' directory does not exist: %s\n", curDir)
+	}
+
+	return nil
+}
+
+// processEmailsInDirectory processes all email files in a directory
+func processEmailsInDirectory(dirPath string, proc *processor.Processor, verbose bool) error {
+	files, err := os.ReadDir(dirPath)
+	if err != nil {
+		return fmt.Errorf("reading directory %s: %w", dirPath, err)
+	}
+
+	if verbose {
+		fmt.Fprintf(os.Stderr, "Found %d files in directory: %s\n", len(files), dirPath)
+	}
+
+	processedCount := 0
+	for _, file := range files {
+		if file.IsDir() {
+			continue // Skip subdirectories
+		}
+
+		// Skip known non-email files
+		name := file.Name()
+		if name == ".DS_Store" || name == "maildirfolder" || name == ".uidvalidity" {
+			continue
+		}
+
+		// Process the email file
+		filePath := filepath.Join(dirPath, name)
+		if err := processEmailFile(filePath, proc, verbose); err != nil && verbose {
+			fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+			continue
+		}
+
+		processedCount++
+	}
+
+	if verbose {
+		fmt.Fprintf(os.Stderr, "Processed %d/%d files in: %s\n", processedCount, len(files), dirPath)
+	}
+
+	return nil
+}
+
+// processEmailFile processes a single email file
+func processEmailFile(filePath string, proc *processor.Processor, verbose bool) error {
+	// Open the file
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to open %s: %v", filePath, err)
+	}
+	defer f.Close()
+
+	// Process the email
+	msg, err := proc.ProcessEmail(f)
+	if verbose {
+		fmt.Fprintf(os.Stderr, "%s > %s\n", filePath, msg)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to process %s: %v", filePath, err)
+	}
+
+	return nil
+}
+
+// processSubdirectories recursively processes all subdirectories
+func processSubdirectories(parentDir string, proc *processor.Processor, verbose bool) error {
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Looking for subfolders in: %s\n", parentDir)
 	}
@@ -89,57 +159,12 @@ func processSubfolders(parentDir string, proc *processor.Processor, verbose bool
 		return fmt.Errorf("reading directory %s: %w", parentDir, err)
 	}
 
-	if verbose {
-		fmt.Fprintf(os.Stderr, "Found %d entries to check for subfolders\n", len(entries))
-	}
-
-	// First, check if we should process files directly in this directory
-	// Some Maildir implementations store emails directly in the folder
-	emailsFound := 0
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-
-		// Skip non-email files
-		name := entry.Name()
-		if name == ".DS_Store" || name == "maildirfolder" || name == ".uidvalidity" {
-			continue
-		}
-
-		// Try to process as email file
-		filePath := filepath.Join(parentDir, name)
-		f, err := os.Open(filePath)
-		if err != nil {
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Warning: Failed to open %s: %v\n", filePath, err)
-			}
-			continue
-		}
-
-		msg, err := proc.ProcessEmail(f)
-		if verbose {
-			fmt.Fprintf(os.Stderr, "%s > %s\n", filePath, msg)
-		}
-		if err != nil {
-			return fmt.Errorf("processing email file %s: %w", filePath, err)
-		}
-
-		emailsFound++
-		f.Close()
-	}
-
-	if verbose && emailsFound > 0 {
-		fmt.Fprintf(os.Stderr, "Processed %d email files directly in directory\n", emailsFound)
-	}
-
-	// Now process subdirectories
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 
-		// Skip special directories
+		// Skip special Maildir directories
 		name := entry.Name()
 		if name == "new" || name == "cur" || name == "tmp" {
 			continue
@@ -152,98 +177,22 @@ func processSubfolders(parentDir string, proc *processor.Processor, verbose bool
 
 		// Check if this is a maildir subfolder (has new and/or cur directories)
 		isMaildir := false
-		hasCur := false
-		hasNew := false
-
 		if _, err := os.Stat(filepath.Join(subPath, "cur")); err == nil {
 			isMaildir = true
-			hasCur = true
 		}
 		if _, err := os.Stat(filepath.Join(subPath, "new")); err == nil {
 			isMaildir = true
-			hasNew = true
 		}
 
-		if isMaildir {
-			// Process this maildir
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Processing maildir subfolder: %s (has cur: %t, has new: %t)\n",
-					subPath, hasCur, hasNew)
-			}
-			if err := processCurrentMaildir(subPath, proc, verbose); err != nil {
-				if verbose {
-					fmt.Fprintf(os.Stderr, "Warning: Error processing maildir %s: %v\n", subPath, err)
-				}
-			}
+		if isMaildir && verbose {
+			fmt.Fprintf(os.Stderr, "Processing maildir subfolder: %s\n", subPath)
 		} else if verbose {
-			fmt.Fprintf(os.Stderr, "Not a standard maildir: %s\n", subPath)
+			fmt.Fprintf(os.Stderr, "Processing non-maildir subfolder: %s\n", subPath)
 		}
 
-		// Recursively process subfolders (even if not a standard maildir)
-		if err := processSubfolders(subPath, proc, verbose); err != nil {
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Warning: Error processing subfolders of %s: %v\n", subPath, err)
-			}
-		}
-	}
-
-	return nil
-}
-
-// processMaildirSubdir processes all email files in a maildir subdirectory
-func processMaildirSubdir(dir string, proc *processor.Processor, verbose bool) error {
-	// Check if directory exists
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return nil // Skip if directory doesn't exist
-	}
-
-	files, err := os.ReadDir(dir)
-	if err != nil {
-		return fmt.Errorf("reading directory %s: %w", dir, err)
-	}
-
-	if verbose {
-		fmt.Fprintf(os.Stderr, "Found %d files in maildir subdirectory: %s\n", len(files), dir)
-	}
-	processedCount := 0
-	unparsedCalendarCount := 0
-
-	for _, file := range files {
-		if file.IsDir() {
-			continue // Skip subdirectories
-		}
-
-		// Open each file
-		filePath := filepath.Join(dir, file.Name())
-		f, err := os.Open(filePath)
-		if err != nil {
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Warning: Failed to open %s: %v\n", filePath, err)
-			}
-			continue
-		}
-
-		if _, err := proc.ProcessEmail(f); err != nil {
-			f.Close()
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)
-			}
-			continue
-		}
-		
-		// Check if this is the problematic calendar email
-		if filepath.Base(filePath) == "example-mail-15.eml" {
-			unparsedCalendarCount++
-		}
-
-		processedCount++
-		f.Close()
-	}
-
-	if verbose {
-		fmt.Fprintf(os.Stderr, "Processed %d/%d files in: %s\n", processedCount, len(files), dir)
-		if unparsedCalendarCount > 0 {
-			fmt.Fprintf(os.Stderr, "Found %d unparseable calendar emails\n", unparsedCalendarCount)
+		// Process this directory (whether it's a maildir or not)
+		if err := processMaildirDirectory(subPath, proc, verbose); err != nil && verbose {
+			fmt.Fprintf(os.Stderr, "Warning: Error processing directory %s: %v\n", subPath, err)
 		}
 	}
 
