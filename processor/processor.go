@@ -34,47 +34,27 @@ func (p *Processor) ProcessEmail(r io.Reader) (string, error) {
 	if parsedEmail.HasCalendar && parsedEmail.Event.UID != "" {
 		// Check if this is a METHOD:REQUEST or METHOD:CANCEL
 		if parsedEmail.Event.Method == "REQUEST" {
-			msg, err := p.processEventRequest(parsedEmail)
-			if err != nil {
-				return msg, err
-			}
-			return msg, nil
+			return p.processEventRequest(parsedEmail)
 		} else if parsedEmail.Event.Method == "CANCEL" {
-			msg, err := p.processEventCancelation(parsedEmail)
-			if err != nil {
-				return msg, err
-			}
-			return msg, nil
+			return p.processEventCancelation(parsedEmail)
 		} else if parsedEmail.Event.Method == "REPLY" {
-			msg, err := p.processEventReply(parsedEmail)
-			if err != nil {
-				return msg, err
-			}
-			return msg, nil
+			return p.processEventReply(parsedEmail)
 		} else {
-			return "", fmt.Errorf("unsupported calendar method: %s", parsedEmail.Event.Method)
+			return p.processEvent(parsedEmail)
 		}
+	} else {
+		return "Processed E-Mail without calendar event", nil
 	}
-
-	// Only output the regular message if this is a calendar event
-	// and it wasn't already reported as having a lower sequence number
-	if parsedEmail.HasCalendar && 
-		!(parsedEmail.Event.Sequence < existingEventSequence(p.Storage, parsedEmail.Event.UID)) {
-		outputPlainText(parsedEmail)
-	}
-
-	return "Processed E-Mail without calendar event", nil
 }
 
-// processEventRequest handles calendar events with METHOD:REQUEST
-func (p *Processor) processEventRequest(parsedEmail *email.Email) (string, error) {
+func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 	// Check for existing event with the same UID
 	existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
 	if err == nil && existingEvent != nil {
 		// Only update if the sequence number is higher or equal (equal for backward compatibility)
 		if parsedEmail.Event.Sequence < existingEvent.Sequence {
-			return fmt.Sprintf("Not processing event with lower sequence number (%d < %d) with UID %s", 
-				parsedEmail.Event.Sequence, existingEvent.Sequence, 
+			return fmt.Sprintf("Not processing event with lower sequence number (%d < %d) with UID %s",
+				parsedEmail.Event.Sequence, existingEvent.Sequence,
 				parsedEmail.Event.UID), nil
 		} else {
 			// Check if this is a recurring event update
@@ -97,7 +77,7 @@ func (p *Processor) processEventRequest(parsedEmail *email.Email) (string, error
 					return "Error storing event", fmt.Errorf("storing event: %w", err)
 				}
 
-				return fmt.Sprintf("Updated event with UID %s, new sequence: %d", 
+				return fmt.Sprintf("Updated event with UID %s, new sequence: %d",
 					parsedEmail.Event.UID, parsedEmail.Event.Sequence), nil
 			}
 		}
@@ -111,10 +91,14 @@ func (p *Processor) processEventRequest(parsedEmail *email.Email) (string, error
 	}
 }
 
+// processEventRequest handles calendar events with METHOD:REQUEST
+func (p *Processor) processEventRequest(parsedEmail *email.Email) (string, error) {
+	return p.processEvent(parsedEmail)
+}
+
 // processEventCancelation handles calendar events with METHOD:CANCEL
 func (p *Processor) processEventCancelation(parsedEmail *email.Email) (string, error) {
-	// For now, just use the same logic as for REQUEST
-	return p.processEventRequest(parsedEmail)
+	return p.processEvent(parsedEmail)
 }
 
 // processEventReply handles calendar events with METHOD:REPLY
@@ -136,7 +120,7 @@ func (p *Processor) processEventReply(parsedEmail *email.Email) (string, error) 
 				return "Error storing reply event", fmt.Errorf("storing event: %w", err)
 			}
 
-			return fmt.Sprintf("Stored reply event with UID %s (attendee update failed)", 
+			return fmt.Sprintf("Stored reply event with UID %s (attendee update failed)",
 				parsedEmail.Event.UID), nil
 		} else {
 			// Store the updated event
@@ -144,7 +128,7 @@ func (p *Processor) processEventReply(parsedEmail *email.Email) (string, error) 
 				return "Error storing updated event with attendee status", fmt.Errorf("storing updated event: %w", err)
 			}
 
-			return fmt.Sprintf("Updated attendee status for event with UID %s", 
+			return fmt.Sprintf("Updated attendee status for event with UID %s",
 				parsedEmail.Event.UID), nil
 		}
 	} else {
@@ -177,13 +161,13 @@ func (p *Processor) handleRecurringEvent(existingEvent, newEvent *ical.Event) (*
 		if component.Name != "VEVENT" {
 			continue
 		}
-		
+
 		if component.Props.Get("RECURRENCE-ID") != nil {
 			recurrenceEvent = component
 			break
 		}
 	}
-	
+
 	if recurrenceEvent == nil {
 		return nil, fmt.Errorf("no recurring event found in update")
 	}
@@ -243,7 +227,7 @@ func (p *Processor) handleRecurringEvent(existingEvent, newEvent *ical.Event) (*
 		if component.Name != "VEVENT" {
 			continue
 		}
-		
+
 		if component.Props.Get("DTSTAMP") == nil {
 			now := time.Now().UTC().Format("20060102T150405Z")
 			component.Props.Set(&goical.Prop{Name: "DTSTAMP", Value: now})
@@ -307,7 +291,7 @@ func (p *Processor) updateAttendeeStatus(event *ical.Event, storageEvent *ical.E
 	}
 
 	attendeeEmail := attendeeProp.Value
-	
+
 	// Get the PARTSTAT (participation status) from the reply
 	attendeeStatus := ""
 	if partstat := attendeeProp.Params.Get("PARTSTAT"); partstat != "" {
@@ -341,7 +325,7 @@ func (p *Processor) updateAttendeeStatus(event *ical.Event, storageEvent *ical.E
 			updated = true
 			break
 		}
-		
+
 		if updated {
 			component.Props["ATTENDEE"] = attendeeProps
 			break
@@ -373,12 +357,12 @@ func matchesRecurrenceID(event1, event2 *goical.Component) bool {
 	if recurrenceID1 != nil && recurrenceID2 != nil {
 		return recurrenceID1.Value == recurrenceID2.Value
 	}
-	
+
 	// If neither has RECURRENCE-ID, they refer to the master event
 	if recurrenceID1 == nil && recurrenceID2 == nil {
 		return true
 	}
-	
+
 	// One has RECURRENCE-ID and the other doesn't, so they're different instances
 	return false
 }
@@ -398,7 +382,7 @@ func outputPlainText(parsedEmail *email.Email) {
 	// Only output if a calendar event was found
 	if parsedEmail.HasCalendar {
 		// Format: event summary | sequence | UID
-		fmt.Printf("%s | %d | %s\n", 
+		fmt.Printf("%s | %d | %s\n",
 			parsedEmail.Event.Summary,
 			parsedEmail.Event.Sequence,
 			parsedEmail.Event.UID)
