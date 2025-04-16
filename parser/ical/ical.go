@@ -42,6 +42,35 @@ func ParseCalendarData(part *multipart.Part) (*Event, error) {
 	return event, nil
 }
 
+// ParseCalendarReader parses calendar data from an io.Reader with optional encoding
+func ParseCalendarReader(r io.Reader, encoding string) (*Event, error) {
+	// Read all data from the reader
+	body, err := io.ReadAll(r)
+	if err != nil {
+		return nil, fmt.Errorf("reading calendar data: %w", err)
+	}
+
+	// Check if we need to base64 decode
+	var calData []byte
+	if strings.ToLower(encoding) == "base64" {
+		decoded, err := base64.StdEncoding.DecodeString(string(body))
+		if err != nil {
+			return nil, fmt.Errorf("decoding base64: %w", err)
+		}
+		calData = decoded
+	} else {
+		calData = body
+	}
+
+	// Parse the calendar data
+	event, err := ParseICalData(calData)
+	if err != nil {
+		return nil, fmt.Errorf("extracting calendar info: %w", err)
+	}
+
+	return event, nil
+}
+
 // ParseICalData parses iCalendar data and extracts basic event information
 func ParseICalData(icsData []byte) (*Event, error) {
 	// Use a defer-recover to handle any panics in the decoder

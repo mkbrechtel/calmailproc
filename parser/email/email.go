@@ -53,8 +53,20 @@ func Parse(r io.Reader) (*Email, error) {
 		return email, nil
 	}
 
-	// Check if this is a multipart message
-	if strings.HasPrefix(mediaType, "multipart/") {
+	// Check if this is a calendar content directly
+	if strings.Contains(mediaType, "text/calendar") || strings.Contains(mediaType, "application/ics") {
+		email.HasCalendar = true
+		transferEncoding := msg.Header.Get("Content-Transfer-Encoding")
+		event, err := ical.ParseCalendarReader(msg.Body, transferEncoding)
+		if err != nil {
+			// Continue without calendar data if extraction fails
+			fmt.Fprintf(os.Stderr, "Warning: Error extracting calendar data: %v, continuing without event\n", err)
+			email.HasCalendar = false
+		} else {
+			email.Event = event
+		}
+	} else if strings.HasPrefix(mediaType, "multipart/") {
+		// Handle multipart message
 		boundary := params["boundary"]
 		if boundary == "" {
 			// Continue processing without multipart if boundary is missing
