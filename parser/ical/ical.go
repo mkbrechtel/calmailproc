@@ -72,7 +72,11 @@ func ParseCalendarReader(r io.Reader, encoding string) (*Event, error) {
 
 // ParseICalData parses iCalendar data and extracts basic event information
 func ParseICalData(icsData []byte) (*Event, error) {
-	// Use a defer-recover to handle any panics in the decoder
+	// IMPORTANT: The go-ical library can panic on malformed data.
+	// This defer-recover pattern is essential to prevent application crashes
+	// when processing emails with invalid calendar attachments (which happens often).
+	// Without this, the app would crash on certain malformed iCalendar inputs
+	// like index out of range errors that occur with damaged or truncated calendar data.
 	var cal *goical.Calendar
 	var err error
 	
@@ -143,7 +147,12 @@ func ParseICalData(icsData []byte) (*Event, error) {
 
 // DecodeCalendar parses iCalendar data into a Calendar object
 func DecodeCalendar(icsData []byte) (*goical.Calendar, error) {
-	// Use a defer-recover to handle any panics in the decoder
+	// IMPORTANT: The go-ical library can panic on malformed data.
+	// This defer-recover pattern is essential to prevent application crashes
+	// when dealing with invalid calendar data, which is common when
+	// processing emails from different calendar applications and versions.
+	// Each calendar implementation has its quirks, and this safeguard
+	// ensures robust parsing without crashing.
 	var cal *goical.Calendar
 	var err error
 	
