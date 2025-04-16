@@ -355,30 +355,58 @@ Error handling is crucial for a reliable application. Follow these principles:
    - Missing required calendar fields
    - Log issue, skip problematic entry, continue processing
 
-### Error Handling Patterns
+### Status and Error Handling Pattern
 
-1. **Return errors with context**
+The application uses a consistent pattern for error handling where processing functions return a pair of values: a descriptive string and an error object. This pattern follows these principles:
+
+1. **Descriptive Status + Error Pattern**: 
+   - All internal processing functions return (string, error) pairs
+   - The string describes what happened (success or failure reason)
+   - The error is non-nil only if a technical error occurred
+
+2. **Output Separation**:
+   - Only the endpoint processors (processor/stdin and processor/maildir) do the actual printing of error status
+   - All other functions just pass a (string, error) pair where the string is the description of what happened to the item
+
+3. **Progressive Error Context**:
+   - Each layer adds context to errors before passing them up
+   - Status strings are human-readable explanations
+   - Errors contain the technical details for debugging
+
+1. **Return Tuples Pattern**: 
    ```go
-   if err != nil {
-       return fmt.Errorf("parsing email: %w", err)
+   func ProcessEmail(r io.Reader) (string, error) {
+     // Process the email and return a tuple:
+     // - String describing what happened (for user feedback)
+     // - Error if something went wrong (for logical flow)
+     return "Event stored successfully", nil
    }
    ```
 
-2. **Log and continue**
+2. **Context-Rich Errors**: 
    ```go
-   events, err := store.ListEvents()
-   if err != nil {
-       log.Printf("Error listing events: %v, continuing with empty list", err)
-       events = []*CalendarEvent{}
+   if err := parser.Parse(data); err != nil {
+     return "Failed to process event", fmt.Errorf("parsing calendar data: %w", err)
    }
    ```
 
-3. **Graceful degradation**
+3. **Status Messages with Error Codes**:
    ```go
-   // If we can't parse all calendar details, extract what we can
-   if err := parseDetails(data); err != nil {
-       log.Printf("Warning: Partial calendar data extracted: %v", err)
-       // Continue with partial data
+   // For successful operations
+   return fmt.Sprintf("Successfully processed event with UID %s", event.UID), nil
+
+   // For validation issues
+   return fmt.Sprintf("Skipped event with UID %s (sequence too old)", event.UID), nil
+
+   // For actual errors
+   return "Failed to update event", err
+   ```
+
+4. **Error Passthrough**:
+   ```go
+   msg, err := processor.ProcessEvent(event)
+   if err != nil {
+     return fmt.Sprintf("Error in %s: %s", event.UID, msg), err
    }
    ```
 
