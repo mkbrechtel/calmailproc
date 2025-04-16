@@ -18,9 +18,6 @@ func TestParseEmail(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse email: %v", err)
 	}
-	
-	// Set source description for testing
-	email.SourceDescription = "test-file"
 
 	// Check basic email fields
 	if email.Subject == "" {

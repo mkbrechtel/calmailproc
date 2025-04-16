@@ -21,7 +21,6 @@ type Email struct {
 	Date              time.Time
 	HasCalendar       bool
 	Event             *ical.Event
-	SourceDescription string // Description of the email source (filename, stdin, etc.)
 }
 
 // Parse parses an email from an io.Reader and extracts calendar data if present
@@ -78,7 +77,7 @@ func Parse(r io.Reader) (*Email, error) {
 
 			// Check for calendar part
 			partContentType := part.Header.Get("Content-Type")
-			if strings.Contains(partContentType, "text/calendar") {
+			if strings.Contains(partContentType, "text/calendar") || strings.Contains(partContentType, "application/ics") {
 				email.HasCalendar = true
 				event, err := ical.ParseCalendarData(part)
 				if err != nil {

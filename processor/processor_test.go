@@ -78,24 +78,24 @@ func TestProcessEmail(t *testing.T) {
 			wantErr:        false,
 		},
 		{
-			name:           "Example mail 09 - No calendar data",
+			name:           "Example mail 09 - Calendar data as application/ics",
 			emailFile:      "../test/maildir/cur/example-mail-09.eml",
 			processReplies: true,
-			wantStoreCount: 0, // No calendar data to store
+			wantStoreCount: 1, // Now detecting application/ics calendar data
 			wantErr:        false,
 		},
 		{
-			name:           "Example mail 10 - No calendar data",
+			name:           "Example mail 10 - Calendar data as application/ics",
 			emailFile:      "../test/maildir/cur/example-mail-10.eml",
 			processReplies: true,
-			wantStoreCount: 0, // No calendar data to store
+			wantStoreCount: 1, // Now detecting application/ics calendar data
 			wantErr:        false,
 		},
 		{
-			name:           "Example mail 11 - No calendar data",
+			name:           "Example mail 11 - Calendar data as application/ics",
 			emailFile:      "../test/maildir/cur/example-mail-11.eml",
 			processReplies: true,
-			wantStoreCount: 0, // No calendar data to store
+			wantStoreCount: 1, // Now detecting application/ics calendar data
 			wantErr:        false,
 		},
 		{
@@ -113,10 +113,10 @@ func TestProcessEmail(t *testing.T) {
 			wantErr:        false,
 		},
 		{
-			name:           "Example mail 13 - No calendar data",
+			name:           "Example mail 13 - Calendar data as application/ics",
 			emailFile:      "../test/maildir/cur/example-mail-13.eml",
 			processReplies: true,
-			wantStoreCount: 0, // No calendar data to store
+			wantStoreCount: 1, // Now detecting application/ics calendar data
 			wantErr:        false,
 		},
 		{
