@@ -49,7 +49,7 @@ func (p *Processor) ProcessEmail(r io.Reader) (string, error) {
 
 func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 	// First, validate the event by testing decode and encode
-	if err := ical.TestEventDecodeAndEncode(parsedEmail.Event.RawData); err != nil {
+	if err := ical.ValidateEvent(parsedEmail.Event.RawData); err != nil {
 		return fmt.Sprintf("Invalid calendar data for event with UID %s", parsedEmail.Event.UID),
 			fmt.Errorf("validation error for event %s: %w", parsedEmail.Event.UID, err)
 	}
@@ -72,7 +72,7 @@ func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 				}
 
 				// Validate the updated event
-				if err := ical.TestEventDecodeAndEncode(updatedEvent.RawData); err != nil {
+				if err := ical.ValidateEvent(updatedEvent.RawData); err != nil {
 					return fmt.Sprintf("Invalid calendar data after update for event with UID %s", updatedEvent.UID),
 						fmt.Errorf("validation error after update for event %s: %w", updatedEvent.UID, err)
 				}
@@ -121,7 +121,7 @@ func (p *Processor) processEventReply(parsedEmail *email.Email) (string, error) 
 	}
 
 	// First, validate the event
-	if err := ical.TestEventDecodeAndEncode(parsedEmail.Event.RawData); err != nil {
+	if err := ical.ValidateEvent(parsedEmail.Event.RawData); err != nil {
 		return fmt.Sprintf("Invalid calendar data for event reply with UID %s", parsedEmail.Event.UID),
 			fmt.Errorf("validation error for event reply %s: %w", parsedEmail.Event.UID, err)
 	}
@@ -142,7 +142,7 @@ func (p *Processor) processEventReply(parsedEmail *email.Email) (string, error) 
 				parsedEmail.Event.UID), nil
 		} else {
 			// Validate the updated event before storing
-			if err := ical.TestEventDecodeAndEncode(existingEvent.RawData); err != nil {
+			if err := ical.ValidateEvent(existingEvent.RawData); err != nil {
 				return fmt.Sprintf("Invalid calendar data after attendee update for event with UID %s", existingEvent.UID),
 					fmt.Errorf("validation error after attendee update for event %s: %w", existingEvent.UID, err)
 			}

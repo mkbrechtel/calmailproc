@@ -8,7 +8,6 @@ import (
 	"mime/multipart"
 	"os"
 	"strings"
-	"time"
 
 	goical "github.com/emersion/go-ical"
 )
@@ -77,7 +76,7 @@ func ParseICalData(icsData []byte) (*Event, error) {
 	// Use a defer-recover to handle any panics in the decoder
 	var cal *goical.Calendar
 	var err error
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -85,10 +84,10 @@ func ParseICalData(icsData []byte) (*Event, error) {
 				err = fmt.Errorf("panic in decoder: %v", r)
 			}
 		}()
-		
+
 		cal, err = goical.NewDecoder(bytes.NewReader(icsData)).Decode()
 	}()
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("parsing iCal data: %w", err)
 	}
@@ -148,7 +147,7 @@ func ParseICalData(icsData []byte) (*Event, error) {
 func DecodeCalendar(icsData []byte) (*goical.Calendar, error) {
 	var cal *goical.Calendar
 	var err error
-	
+
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -156,14 +155,14 @@ func DecodeCalendar(icsData []byte) (*goical.Calendar, error) {
 				err = fmt.Errorf("panic in decoder: %v", r)
 			}
 		}()
-		
+
 		cal, err = goical.NewDecoder(bytes.NewReader(icsData)).Decode()
 	}()
-	
+
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return cal, nil
 }
 
@@ -171,50 +170,12 @@ func DecodeCalendar(icsData []byte) (*goical.Calendar, error) {
 func EncodeCalendar(cal *goical.Calendar) ([]byte, error) {
 	var buf bytes.Buffer
 	encoder := goical.NewEncoder(&buf)
-	
+
 	if err := encoder.Encode(cal); err != nil {
 		return nil, fmt.Errorf("encoding calendar: %w", err)
 	}
-	
-	return buf.Bytes(), nil
-}
 
-// TestEventDecodeAndEncode attempts to decode and re-encode the event to validate
-// that it can be properly stored without errors
-func TestEventDecodeAndEncode(rawIcalData []byte) error {
-	// First attempt to decode the calendar
-	cal, err := DecodeCalendar(rawIcalData)
-	if err != nil {
-		return fmt.Errorf("decoding calendar: %w", err)
-	}
-	
-	// Check for VEVENT components and validate them
-	for _, component := range cal.Children {
-		if component.Name != "VEVENT" {
-			continue
-		}
-		
-		// Check for required DTSTAMP property
-		if component.Props.Get("DTSTAMP") == nil {
-			// Add a DTSTAMP property if missing
-			now := time.Now().UTC().Format("20060102T150405Z")
-			component.Props.Set(&goical.Prop{Name: "DTSTAMP", Value: now})
-		}
-		
-		// Check for exclusive DTEND and DURATION properties (can't have both)
-		if component.Props.Get("DTEND") != nil && component.Props.Get("DURATION") != nil {
-			// Remove DURATION if both are present (prioritize DTEND)
-			component.Props.Del("DURATION")
-		}
-	}
-	
-	// Now try to re-encode to validate
-	_, err = EncodeCalendar(cal)
-	if err != nil {
-		return fmt.Errorf("encoding calendar: %w", err)
-	}
-	
-	return nil
+	return buf.Bytes(), nil
 }
 
 // NewCalendar creates a new iCalendar object
@@ -233,4 +194,3 @@ type Component = goical.Component
 
 // Prop is the exported type for go-ical.Prop
 type Prop = goical.Prop
-
