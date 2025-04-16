@@ -48,6 +48,12 @@ func (p *Processor) ProcessEmail(r io.Reader) (string, error) {
 }
 
 func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
+	// First, validate the event by testing decode and encode
+	if err := ical.TestEventDecodeAndEncode(parsedEmail.Event.RawData); err != nil {
+		return fmt.Sprintf("Invalid calendar data for event with UID %s", parsedEmail.Event.UID),
+			fmt.Errorf("validation error for event %s: %w", parsedEmail.Event.UID, err)
+	}
+
 	// Check for existing event with the same UID
 	existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
 	if err == nil && existingEvent != nil {
@@ -63,6 +69,12 @@ func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 				updatedEvent, err := p.handleRecurringEvent(existingEvent, parsedEmail.Event)
 				if err != nil {
 					return "Error handling recurring event", fmt.Errorf("handling recurring event: %w", err)
+				}
+
+				// Validate the updated event
+				if err := ical.TestEventDecodeAndEncode(updatedEvent.RawData); err != nil {
+					return fmt.Sprintf("Invalid calendar data after update for event with UID %s", updatedEvent.UID),
+						fmt.Errorf("validation error after update for event %s: %w", updatedEvent.UID, err)
 				}
 
 				// Store the updated event
@@ -108,6 +120,12 @@ func (p *Processor) processEventReply(parsedEmail *email.Email) (string, error) 
 		return "Ignoring calendar REPLY method as configured", nil
 	}
 
+	// First, validate the event
+	if err := ical.TestEventDecodeAndEncode(parsedEmail.Event.RawData); err != nil {
+		return fmt.Sprintf("Invalid calendar data for event reply with UID %s", parsedEmail.Event.UID),
+			fmt.Errorf("validation error for event reply %s: %w", parsedEmail.Event.UID, err)
+	}
+
 	// Try to find the existing event to update attendee status
 	existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
 	if err == nil && existingEvent != nil {
@@ -123,6 +141,12 @@ func (p *Processor) processEventReply(parsedEmail *email.Email) (string, error) 
 			return fmt.Sprintf("Stored reply event with UID %s (attendee update failed)",
 				parsedEmail.Event.UID), nil
 		} else {
+			// Validate the updated event before storing
+			if err := ical.TestEventDecodeAndEncode(existingEvent.RawData); err != nil {
+				return fmt.Sprintf("Invalid calendar data after attendee update for event with UID %s", existingEvent.UID),
+					fmt.Errorf("validation error after attendee update for event %s: %w", existingEvent.UID, err)
+			}
+
 			// Store the updated event
 			if err := p.Storage.StoreEvent(existingEvent); err != nil {
 				return "Error storing updated event with attendee status", fmt.Errorf("storing updated event: %w", err)

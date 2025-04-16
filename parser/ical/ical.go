@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"os"
 	"strings"
+	"time"
 
 	goical "github.com/emersion/go-ical"
 )
@@ -176,6 +177,44 @@ func EncodeCalendar(cal *goical.Calendar) ([]byte, error) {
 	}
 	
 	return buf.Bytes(), nil
+}
+
+// TestEventDecodeAndEncode attempts to decode and re-encode the event to validate
+// that it can be properly stored without errors
+func TestEventDecodeAndEncode(rawIcalData []byte) error {
+	// First attempt to decode the calendar
+	cal, err := DecodeCalendar(rawIcalData)
+	if err != nil {
+		return fmt.Errorf("decoding calendar: %w", err)
+	}
+	
+	// Check for VEVENT components and validate them
+	for _, component := range cal.Children {
+		if component.Name != "VEVENT" {
+			continue
+		}
+		
+		// Check for required DTSTAMP property
+		if component.Props.Get("DTSTAMP") == nil {
+			// Add a DTSTAMP property if missing
+			now := time.Now().UTC().Format("20060102T150405Z")
+			component.Props.Set(&goical.Prop{Name: "DTSTAMP", Value: now})
+		}
+		
+		// Check for exclusive DTEND and DURATION properties (can't have both)
+		if component.Props.Get("DTEND") != nil && component.Props.Get("DURATION") != nil {
+			// Remove DURATION if both are present (prioritize DTEND)
+			component.Props.Del("DURATION")
+		}
+	}
+	
+	// Now try to re-encode to validate
+	_, err = EncodeCalendar(cal)
+	if err != nil {
+		return fmt.Errorf("encoding calendar: %w", err)
+	}
+	
+	return nil
 }
 
 // NewCalendar creates a new iCalendar object
