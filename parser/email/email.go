@@ -74,34 +74,77 @@ func Parse(r io.Reader) (*Email, error) {
 			return email, nil
 		}
 
-		// Read the multipart body
-		mr := multipart.NewReader(msg.Body, boundary)
-		for {
-			part, err := mr.NextPart()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				// Continue processing if one part fails
-				fmt.Fprintf(os.Stderr, "Warning: Error reading multipart: %v, continuing with parsed parts\n", err)
-				break
-			}
+		// Process the multipart message recursively to handle nested multiparts
+		email = processMultipart(msg.Body, boundary, email)
+	}
 
-			// Check for calendar part
-			partContentType := part.Header.Get("Content-Type")
-			if strings.Contains(partContentType, "text/calendar") || strings.Contains(partContentType, "application/ics") {
-				email.HasCalendar = true
-				event, err := ical.ParseCalendarData(part)
+	return email, nil
+}
+
+// processMultipart processes a multipart message part and recursively processes nested multiparts
+func processMultipart(r io.Reader, boundary string, email *Email) *Email {
+	mr := multipart.NewReader(r, boundary)
+	
+	for {
+		part, err := mr.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			// Continue processing if one part fails
+			fmt.Fprintf(os.Stderr, "Warning: Error reading multipart: %v, continuing with parsed parts\n", err)
+			break
+		}
+
+		// Get the part's content type
+		partContentType := part.Header.Get("Content-Type")
+		mediaType, params, err := mime.ParseMediaType(partContentType)
+		if err != nil {
+			// Skip parts with invalid content type
+			continue
+		}
+
+		// Check for calendar parts
+		contentDisposition := part.Header.Get("Content-Disposition")
+		fileName := ""
+		if contentDisposition != "" {
+			_, params, err := mime.ParseMediaType(contentDisposition)
+			if err == nil && params["filename"] != "" {
+				fileName = params["filename"]
+			}
+		}
+
+		if strings.Contains(mediaType, "text/calendar") || 
+		   strings.Contains(mediaType, "application/ics") ||
+		   strings.Contains(mediaType, "text/x-vCalendar") ||
+		   strings.HasSuffix(fileName, ".ics") {
+			
+			email.HasCalendar = true
+			event, err := ical.ParseCalendarData(part)
+			if err != nil {
+				// Continue without calendar data if extraction fails
+				fmt.Fprintf(os.Stderr, "Warning: Error extracting calendar data: %v, continuing without event\n", err)
+				email.HasCalendar = false
+			} else {
+				email.Event = event
+			}
+			// Continue processing other parts in case there are multiple calendar entries
+		} else if strings.HasPrefix(mediaType, "multipart/") {
+			// Process nested multipart content recursively
+			nestedBoundary := params["boundary"]
+			if nestedBoundary != "" {
+				// Create a copy of the part data
+				partData, err := io.ReadAll(part)
 				if err != nil {
-					// Continue without calendar data if extraction fails
-					fmt.Fprintf(os.Stderr, "Warning: Error extracting calendar data: %v, continuing without event\n", err)
-					email.HasCalendar = false
-				} else {
-					email.Event = event
+					fmt.Fprintf(os.Stderr, "Warning: Error reading nested multipart data: %v\n", err)
+					continue
 				}
+				
+				// Process the nested multipart
+				email = processMultipart(strings.NewReader(string(partData)), nestedBoundary, email)
 			}
 		}
 	}
 
-	return email, nil
+	return email
 }
