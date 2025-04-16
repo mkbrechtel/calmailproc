@@ -117,7 +117,7 @@ func processSubfolders(parentDir string, proc *processor.Processor, verbose bool
 			continue
 		}
 
-		msg, err := proc.ProcessEmail(f, filePath)
+		msg, err := proc.ProcessEmail(f)
 		if verbose {
 			fmt.Fprintf(os.Stderr, "%s > %s\n", filePath, msg)
 		}
@@ -223,8 +223,7 @@ func processMaildirSubdir(dir string, proc *processor.Processor, verbose bool) e
 			continue
 		}
 
-		// Process the email silently 
-		if err := proc.ProcessEmail(f, filePath); err != nil {
+		if _, err := proc.ProcessEmail(f); err != nil {
 			f.Close()
 			if verbose {
 				fmt.Fprintf(os.Stderr, "Warning: Failed to process %s: %v\n", filePath, err)

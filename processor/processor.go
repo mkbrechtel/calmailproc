@@ -34,17 +34,23 @@ func (p *Processor) ProcessEmail(r io.Reader) (string, error) {
 	if parsedEmail.HasCalendar && parsedEmail.Event.UID != "" {
 		// Check if this is a METHOD:REQUEST or METHOD:CANCEL
 		if parsedEmail.Event.Method == "REQUEST" {
-			if err := p.processEventRequest(parsedEmail); err != nil {
-				return "", err
+			msg, err := p.processEventRequest(parsedEmail)
+			if err != nil {
+				return msg, err
 			}
+			return msg, nil
 		} else if parsedEmail.Event.Method == "CANCEL" {
-			if err := p.processEventCancelation(parsedEmail); err != nil {
-				return "", err
+			msg, err := p.processEventCancelation(parsedEmail)
+			if err != nil {
+				return msg, err
 			}
+			return msg, nil
 		} else if parsedEmail.Event.Method == "REPLY" {
-			if err := p.processEventReply(parsedEmail); err != nil {
-				return "", err
+			msg, err := p.processEventReply(parsedEmail)
+			if err != nil {
+				return msg, err
 			}
+			return msg, nil
 		} else {
 			return "", fmt.Errorf("unsupported calendar method: %s", parsedEmail.Event.Method)
 		}
@@ -391,9 +397,8 @@ func existingEventSequence(store storage.Storage, uid string) int {
 func outputPlainText(parsedEmail *email.Email) {
 	// Only output if a calendar event was found
 	if parsedEmail.HasCalendar {
-		// Format: source | event summary | sequence | UID
-		fmt.Printf("%s | %s | %d | %s\n", 
-			parsedEmail.SourceDescription,
+		// Format: event summary | sequence | UID
+		fmt.Printf("%s | %d | %s\n", 
 			parsedEmail.Event.Summary,
 			parsedEmail.Event.Sequence,
 			parsedEmail.Event.UID)

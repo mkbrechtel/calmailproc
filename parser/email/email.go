@@ -21,6 +21,7 @@ type Email struct {
 	Date              time.Time
 	HasCalendar       bool
 	Event             *ical.Event
+	SourceDescription string // Description of the email source (filename, stdin, etc.)
 }
 
 // Parse parses an email from an io.Reader and extracts calendar data if present

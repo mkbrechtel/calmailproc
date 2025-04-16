@@ -52,7 +52,7 @@ END:VCALENDAR
 `
 
 	// Process the original invitation
-	err := proc.ProcessEmail(bytes.NewBufferString(baseEmail), "base-recurring-email")
+	_, err := proc.ProcessEmail(bytes.NewBufferString(baseEmail))
 	if err != nil {
 		t.Fatalf("Failed to process base recurring email: %v", err)
 	}
@@ -94,7 +94,7 @@ END:VCALENDAR
 `
 
 	// Process the instance update
-	err = proc.ProcessEmail(bytes.NewBufferString(instanceEmail), "instance-update-email")
+	_, err = proc.ProcessEmail(bytes.NewBufferString(instanceEmail))
 	if err != nil {
 		t.Fatalf("Failed to process instance update email: %v", err)
 	}

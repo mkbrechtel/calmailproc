@@ -11,10 +11,11 @@ import (
 // Process processes a single email from stdin
 func Process(proc *processor.Processor) error {
 	// Process email from stdin
-	if err := proc.ProcessEmail(os.Stdin, "stdin"); err != nil {
+	msg, err := proc.ProcessEmail(os.Stdin)
+	if err != nil {
 		return fmt.Errorf("processing stdin: %w", err)
 	}
-
+	fmt.Println(msg)
 	return nil
 }
 
@@ -22,9 +23,10 @@ func Process(proc *processor.Processor) error {
 // Useful for testing and for cases where the input isn't strictly stdin
 func ProcessReader(r io.Reader, proc *processor.Processor) error {
 	// Process email from reader
-	if err := proc.ProcessEmail(r, "reader"); err != nil {
+	msg, err := proc.ProcessEmail(r)
+	if err != nil {
 		return fmt.Errorf("processing email: %w", err)
 	}
-
+	fmt.Println(msg)
 	return nil
 }
