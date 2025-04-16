@@ -162,24 +162,13 @@ func (s *ICalFileStorage) WriteAndUnlock() error {
 
 		// Add all events to the calendar
 		for _, event := range events {
-			// Parse the event data to extract VEVENT components
 			eventCal, err := ical.DecodeCalendar(event.RawData)
 			if err != nil {
-				continue // Skip events that can't be decoded
+				continue
 			}
 
-			// Extract the VEVENT components
 			for _, component := range eventCal.Children {
 				if component.Name == "VEVENT" {
-					// Check for duplicate URL properties safely
-					if len(component.Props["URL"]) > 1 {
-						fmt.Printf("Warning: Event with UID %s has multiple URL properties. This may cause errors when encoding.\n", 
-							event.UID)
-						
-						// Keep only the first URL property to prevent encoding errors
-						component.Props["URL"] = component.Props["URL"][:1]
-					}
-
 					cal.Children = append(cal.Children, component)
 				}
 			}
