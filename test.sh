@@ -12,7 +12,7 @@ rm -rf "test/out"
 
 
 echo "=== Testing maildir mode ==="
-$calmailproc -process-replies -maildir test/maildir -vdir test/out/vdir1
+$calmailproc -process-replies -maildir test/maildir -vdir test/out/vdir1 -verbose
 
 # Loop through storage methods
 for method in "vdir" "icalfile"; do

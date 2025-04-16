@@ -63,7 +63,7 @@ func (p *Processor) ProcessEmail(r io.Reader) (string, error) {
 		outputPlainText(parsedEmail)
 	}
 
-	return "Successfully processed email", nil
+	return "Processed E-Mail without calendar event", nil
 }
 
 // processEventRequest handles calendar events with METHOD:REQUEST

@@ -138,8 +138,8 @@ func processEmailFile(filePath string, proc *processor.Processor, verbose bool) 
 
 	// Process the email
 	msg, err := proc.ProcessEmail(f)
-	if verbose {
-		fmt.Fprintf(os.Stderr, "%s > %s\n", filePath, msg)
+	if verbose || msg != "Processed E-Mail without calendar event" {
+		fmt.Fprintf(os.Stdout, "%s > %s\n", filePath, msg)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to process %s: %v", filePath, err)
