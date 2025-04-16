@@ -47,10 +47,8 @@ func processMaildirDirectory(dirPath string, proc *processor.Processor, verbose 
 		return err
 	}
 
-	// Process emails directly in this directory (some implementations do this)
-	if err := processEmailsInDirectory(dirPath, proc, verbose); err != nil {
-		return err
-	}
+	// Don't process emails directly in the main directory - only standard maildir folders
+	// and subdirectories will be processed
 
 	// Process subdirectories recursively
 	return processSubdirectories(dirPath, proc, verbose)
