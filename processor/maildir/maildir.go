@@ -110,7 +110,7 @@ func processEmailsInDirectory(dirPath string, proc *processor.Processor, verbose
 
 		// Process the email file
 		filePath := filepath.Join(dirPath, name)
-		if err := processEmailFile(filePath, proc, verbose); err != nil && verbose {
+		if err := processEmailFile(filePath, proc, verbose); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 			continue
 		}
