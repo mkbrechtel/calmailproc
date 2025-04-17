@@ -17,7 +17,7 @@ $calmailproc -process-replies -maildir test/maildir -vdir test/out/vdir1 -verbos
 # Loop through storage methods
 for method in "vdir" "icalfile"; do
     echo "=== Testing $method storage ==="
-    
+
     # Set up args based on method
     if [ "$method" == "vdir" ]; then
         storage_dir="test/out/vdir2"
@@ -26,15 +26,36 @@ for method in "vdir" "icalfile"; do
         storage_file="test/out/calendar.ics"
         args="-process-replies -icalfile $storage_file"
     fi
-    
+
     # Process all example emails
     for mail in test/maildir/cur/example-mail-*.eml; do
-       # Process the email
+        # Process the email
         echo
         echo "Processing $mail with $method storage"
+
+        # Determine expected exit code based on mail file
+        expected_exit_code=0
+        if [[ "$mail" == *"example-mail-15.eml" ]]; then
+            expected_exit_code=1
+        fi
+
+        # Run command and capture exit code
+        set +e
         $calmailproc $args < "$mail"
+        actual_exit_code=$?
+        set -e
+                
+        # Check if exit code matches expected
+        if [ $actual_exit_code -eq $expected_exit_code ]; then
+            if [ $expected_exit_code -ne 0 ]; then
+                echo "✓ Expected error occurred (exit code $actual_exit_code)"
+            fi
+        else
+            echo "✗ ERROR: Expected exit code $expected_exit_code but got $actual_exit_code"
+            exit 1
+        fi
     done
-    
+
     # Simple verification
     if [ "$method" == "vdir" ]; then
         file_count=$(find "$storage_dir" -type f | wc -l)
