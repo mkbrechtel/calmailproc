@@ -427,6 +427,28 @@ The application uses a consistent pattern for error handling where processing fu
 5. Benchmark: `go test -bench=. ./...`
 6. End-to-end testing: `./test.sh`
 
+## Developer Tools
+
+The repository includes several useful developer tools:
+
+### Mail Attachment Decoder
+
+A utility for decoding and viewing email attachments in plain text format. This is particularly useful for examining email structure and calendar invitations.
+
+Location: `utils/maildecoder/`
+
+Usage:
+```bash
+# View email structure and text attachments
+cd utils/maildecoder && go build
+./maildecoder -email=/path/to/email.eml
+
+# Extract all attachments to files
+./maildecoder -email=/path/to/email.eml -extract-all
+```
+
+See `utils/maildecoder/README.md` for more details on usage options.
+
 ## Documentation
 
 For better understanding of the libraries used in this project, you can use Go's built-in documentation tool:
