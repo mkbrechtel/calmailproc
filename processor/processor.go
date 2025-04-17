@@ -400,15 +400,3 @@ func existingEventSequence(store storage.Storage, uid string) int {
 	}
 	return -1 // Return -1 if event doesn't exist or there's an error
 }
-
-// outputPlainText prints email information in plain text format
-func outputPlainText(parsedEmail *email.Email) {
-	// Only output if a calendar event was found
-	if parsedEmail.HasCalendar {
-		// Format: event summary | sequence | UID
-		fmt.Printf("%s | %d | %s\n",
-			parsedEmail.Event.Summary,
-			parsedEmail.Event.Sequence,
-			parsedEmail.Event.UID)
-	}
-}
