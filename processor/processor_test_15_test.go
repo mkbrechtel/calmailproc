@@ -7,15 +7,15 @@ import (
 	"github.com/mkbrechtel/calmailproc/storage/memory"
 )
 
-func TestProcessorTest12InvalidCalendarData(t *testing.T) {
+func TestProcessorTest15DuplicateDTSTAMP(t *testing.T) {
 	// Create an in-memory storage
 	store := memory.NewMemoryStorage()
 	processor := NewProcessor(store, true)
 
-	// Read the email file containing invalid calendar data
-	mailFile, err := os.Open("../test/maildir/cur/test-12.eml")
+	// Read the email file containing iCalendar data with duplicate DTSTAMP properties
+	mailFile, err := os.Open("../test/maildir/cur/test-15.eml")
 	if err != nil {
-		t.Fatalf("Error opening test-12.eml: %v", err)
+		t.Fatalf("Error opening test-15.eml: %v", err)
 	}
 	defer mailFile.Close()
 
@@ -24,15 +24,15 @@ func TestProcessorTest12InvalidCalendarData(t *testing.T) {
 	
 	// Verify that we got an error
 	if err == nil {
-		t.Fatal("Expected an error when processing invalid calendar data, but got none")
+		t.Fatal("Expected an error when processing calendar data with duplicate DTSTAMP properties, but got none")
 	}
 
 	// Log the actual error
 	t.Logf("Received error as expected: %v", err)
 
-	// The error should be related to parsing iCal data
-	if containsAny(err.Error(), []string{"panic", "iCal", "calendar", "index out of range"}) {
-		t.Logf("Error message contains expected terms related to parsing invalid iCal data")
+	// The error should be related to validation error for duplicate DTSTAMP properties
+	if containsAny(err.Error(), []string{"validation", "error", "DTSTAMP", "property", "got 2"}) {
+		t.Logf("Error message contains expected terms related to duplicate DTSTAMP properties")
 	} else {
 		t.Errorf("Error message does not match expected format: %v", err)
 	}
@@ -47,5 +47,3 @@ func TestProcessorTest12InvalidCalendarData(t *testing.T) {
 		t.Errorf("Expected 0 events to be stored, got %d", len(events))
 	}
 }
-
-// Using containsAny and contains from processor_test_utils.go
