@@ -23,112 +23,112 @@ func TestProcessEmail(t *testing.T) {
 		// Test all mail files individually
 		{
 			name:           "Example mail 01 - Basic calendar invitation",
-			emailFile:      "../test/maildir/cur/example-mail-01.eml",
+			emailFile:      "../test/maildir/cur/test-01-1.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 02 - Cancelled event",
-			emailFile:      "../test/maildir/cur/example-mail-02.eml",
+			emailFile:      "../test/maildir/cur/test-01-2.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 03 - Calendar event",
-			emailFile:      "../test/maildir/cur/example-mail-03.eml",
+			emailFile:      "../test/maildir/cur/test-02-1.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 04 - Calendar event",
-			emailFile:      "../test/maildir/cur/example-mail-04.eml",
+			emailFile:      "../test/maildir/cur/test-02-2.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 05 - Original recurring event",
-			emailFile:      "../test/maildir/cur/example-mail-05.eml",
+			emailFile:      "../test/maildir/cur/test-03-1.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 06 - Cancelled instance",
-			emailFile:      "../test/maildir/cur/example-mail-06.eml",
+			emailFile:      "../test/maildir/cur/test-03-2.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 07 - Modified instance",
-			emailFile:      "../test/maildir/cur/example-mail-07.eml",
+			emailFile:      "../test/maildir/cur/test-03-3.eml",
 			processReplies: true,
 			wantStoreCount: 1,
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 08 - No calendar data",
-			emailFile:      "../test/maildir/cur/example-mail-08.eml",
+			emailFile:      "../test/maildir/cur/test-0.eml",
 			processReplies: true,
 			wantStoreCount: 0, // No calendar data to store
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 09 - Calendar data as application/ics",
-			emailFile:      "../test/maildir/cur/example-mail-09.eml",
+			emailFile:      "../test/maildir/cur/test-04-1.eml",
 			processReplies: true,
 			wantStoreCount: 1, // Now detecting application/ics calendar data
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 10 - Calendar data as application/ics",
-			emailFile:      "../test/maildir/cur/example-mail-10.eml",
+			emailFile:      "../test/maildir/cur/test-04-2.eml",
 			processReplies: true,
 			wantStoreCount: 1, // Now detecting application/ics calendar data
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 11 - Calendar data as application/ics",
-			emailFile:      "../test/maildir/cur/example-mail-11.eml",
+			emailFile:      "../test/maildir/cur/test-05-1.eml",
 			processReplies: true,
 			wantStoreCount: 1, // Now detecting application/ics calendar data
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 12 with replies=true - Reply",
-			emailFile:      "../test/maildir/cur/example-mail-12.eml",
+			emailFile:      "../test/maildir/cur/test-05-2.eml",
 			processReplies: true,
 			wantStoreCount: 1, // Reply should be stored
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 12 with replies=false - Reply",
-			emailFile:      "../test/maildir/cur/example-mail-12.eml",
+			emailFile:      "../test/maildir/cur/test-05-2.eml",
 			processReplies: false,
 			wantStoreCount: 0, // Reply should be ignored
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 13 - Calendar data as application/ics",
-			emailFile:      "../test/maildir/cur/example-mail-13.eml",
+			emailFile:      "../test/maildir/cur/test-06-1.eml",
 			processReplies: true,
 			wantStoreCount: 1, // Now detecting application/ics calendar data
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 14 - Reply with replies=true",
-			emailFile:      "../test/maildir/cur/example-mail-14.eml",
+			emailFile:      "../test/maildir/cur/test-06-2.eml",
 			processReplies: true,
 			wantStoreCount: 1, // Reply should be stored
 			wantErr:        false,
 		},
 		{
 			name:           "Example mail 14 with replies=false - Reply",
-			emailFile:      "../test/maildir/cur/example-mail-14.eml",
+			emailFile:      "../test/maildir/cur/test-06-2.eml",
 			processReplies: false,
 			wantStoreCount: 0, // Reply should be ignored
 			wantErr:        false,
@@ -168,7 +168,7 @@ func TestProcessEmail(t *testing.T) {
 }
 
 func TestProcessAllEmails(t *testing.T) {
-	t.Skip("Skipping this test due to iCalendar parsing issue with example-mail-15.eml")
+	t.Skip("Skipping this test due to iCalendar parsing issue with test-12.eml")
 	// Create a memory storage
 	memStorage := memory.NewMemoryStorage()
 
@@ -227,7 +227,7 @@ func TestProcessRepliesControl(t *testing.T) {
 	procWithReplies := NewProcessor(memStorage, true)
 
 	// Process a REPLY type email with process-replies=true (should be stored)
-	replyFile, err := os.Open("../test/maildir/cur/example-mail-12.eml")
+	replyFile, err := os.Open("../test/maildir/cur/test-05-2.eml")
 	if err != nil {
 		t.Fatalf("Failed to open reply file: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestProcessRepliesControl(t *testing.T) {
 	procWithoutReplies := NewProcessor(memStorage, false)
 
 	// Process same REPLY email with process-replies=false (should be ignored)
-	replyFile, err = os.Open("../test/maildir/cur/example-mail-12.eml")
+	replyFile, err = os.Open("../test/maildir/cur/test-05-2.eml")
 	if err != nil {
 		t.Fatalf("Failed to open reply file: %v", err)
 	}
@@ -276,7 +276,7 @@ func TestRecurringEventSequence(t *testing.T) {
 	proc := NewProcessor(memStorage, true)
 
 	// Step 1: Process the original recurring event
-	originalFile, err := os.Open("../test/maildir/cur/example-mail-05.eml")
+	originalFile, err := os.Open("../test/maildir/cur/test-03-1.eml")
 	if err != nil {
 		t.Fatalf("Failed to open original event file: %v", err)
 	}
@@ -293,7 +293,7 @@ func TestRecurringEventSequence(t *testing.T) {
 	}
 
 	// Step 2: Process the modification to a specific instance
-	modifiedFile, err := os.Open("../test/maildir/cur/example-mail-07.eml")
+	modifiedFile, err := os.Open("../test/maildir/cur/test-03-3.eml")
 	if err != nil {
 		t.Fatalf("Failed to open modified event file: %v", err)
 	}
@@ -323,7 +323,7 @@ func TestRecurringEventSequence(t *testing.T) {
 	}
 
 	// Step 3: Process the cancellation of a specific instance
-	cancelFile, err := os.Open("../test/maildir/cur/example-mail-06.eml")
+	cancelFile, err := os.Open("../test/maildir/cur/test-03-2.eml")
 	if err != nil {
 		t.Fatalf("Failed to open cancelled event file: %v", err)
 	}
@@ -368,7 +368,7 @@ func TestOutOfOrderEventSequence(t *testing.T) {
 	// The processor should correctly handle the out-of-sequence numbers
 	
 	// First, process the original event (sequence 0)
-	file16, err := os.Open("../test/maildir/cur/example-mail-16.eml")
+	file16, err := os.Open("../test/maildir/cur/test-07-1.eml")
 	if err != nil {
 		t.Fatalf("Failed to open event file 16: %v", err)
 	}
@@ -385,7 +385,7 @@ func TestOutOfOrderEventSequence(t *testing.T) {
 	}
 	
 	// Process the third update (sequence 3)
-	file17, err := os.Open("../test/maildir/cur/example-mail-17.eml")
+	file17, err := os.Open("../test/maildir/cur/test-07-2.eml")
 	if err != nil {
 		t.Fatalf("Failed to open event file 17: %v", err)
 	}
@@ -402,7 +402,7 @@ func TestOutOfOrderEventSequence(t *testing.T) {
 	}
 
 	// Process the fourth update (sequence 4) 
-	file18, err := os.Open("../test/maildir/cur/example-mail-18.eml")
+	file18, err := os.Open("../test/maildir/cur/test-07-3.eml")
 	if err != nil {
 		t.Fatalf("Failed to open event file 18: %v", err)
 	}
@@ -419,7 +419,7 @@ func TestOutOfOrderEventSequence(t *testing.T) {
 	}
 
 	// Process the second update (sequence 2)
-	file19, err := os.Open("../test/maildir/cur/example-mail-19.eml")
+	file19, err := os.Open("../test/maildir/cur/test-07-4.eml")
 	if err != nil {
 		t.Fatalf("Failed to open event file 19: %v", err)
 	}
@@ -436,7 +436,7 @@ func TestOutOfOrderEventSequence(t *testing.T) {
 	}
 
 	// Process the first update (sequence 1)
-	file20, err := os.Open("../test/maildir/cur/example-mail-20.eml")
+	file20, err := os.Open("../test/maildir/cur/test-07-5.eml")
 	if err != nil {
 		t.Fatalf("Failed to open event file 20: %v", err)
 	}

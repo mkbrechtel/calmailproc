@@ -65,7 +65,7 @@ func TestProcess_MalformedEmails(t *testing.T) {
 	}
 	
 	// We no longer expect to have recovered events with generated UIDs
-	// Instead, example-mail-15.eml should be correctly identified as unparseable
+	// Instead, test-12.eml should be correctly identified as unparseable
 	// and should not appear in the stored events at all
 	
 	// Count events to ensure we're not storing invalid calendar data

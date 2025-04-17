@@ -18,7 +18,7 @@ func TestProcessReader(t *testing.T) {
 	proc := processor.NewProcessor(store, true)
 	
 	// Get test email file
-	testDataPath := filepath.Join("..", "..", "test", "maildir", "cur", "example-mail-01.eml")
+	testDataPath := filepath.Join("..", "..", "test", "maildir", "cur", "test-01-1.eml")
 	emailBytes, err := os.ReadFile(testDataPath)
 	if err != nil {
 		t.Fatalf("Failed to read test email file: %v", err)
