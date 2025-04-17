@@ -35,7 +35,7 @@ for method in "vdir" "icalfile"; do
 
         # Determine expected exit code based on mail file
         expected_exit_code=0
-        if [[ "$mail" == *"example-mail-15.eml" ]]; then
+        if [[ "$mail" == *"example-mail-15.eml" ]] || [[ "$mail" == *"example-mail-21.eml" ]]; then
             expected_exit_code=1
         fi
 
