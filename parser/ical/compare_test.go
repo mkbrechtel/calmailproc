@@ -163,8 +163,20 @@ func TestParseICalTime(t *testing.T) {
 			isError:  false,
 		},
 		{
+			name:     "ISO format with Z",
+			timeStr:  "2023-07-01T122600Z",
+			expected: time.Date(2023, 7, 1, 12, 26, 0, 0, time.UTC),
+			isError:  false,
+		},
+		{
+			name:     "ISO format without Z",
+			timeStr:  "2023-07-01T122600",
+			expected: time.Date(2023, 7, 1, 12, 26, 0, 0, time.UTC),
+			isError:  false,
+		},
+		{
 			name:     "invalid format",
-			timeStr:  "2025-04-17T11:21:40Z",
+			timeStr:  "2025-04-17T11:21:40:123Z",
 			expected: time.Time{},
 			isError:  true,
 		},

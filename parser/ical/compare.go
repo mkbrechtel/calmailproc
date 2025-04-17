@@ -115,7 +115,7 @@ func extractDTSTAMP(icsData []byte) (time.Time, error) {
 
 // parseICalTime parses an iCalendar timestamp string into a time.Time
 func parseICalTime(timeStr string) (time.Time, error) {
-	// iCalendar format: 20250417T112140Z (yyyyMMddTHHmmssZ)
+	// First try standard iCalendar format: 20250417T112140Z (yyyyMMddTHHmmssZ)
 	layout := "20060102T150405Z"
 	
 	// Handle timestamps with timezone identifier
@@ -125,5 +125,17 @@ func parseICalTime(timeStr string) (time.Time, error) {
 		layout = "20060102T150405"
 	}
 
-	return time.Parse(layout, timeStr)
+	t, err := time.Parse(layout, timeStr)
+	if err == nil {
+		return t, nil
+	}
+
+	// Fallback to ISO format if standard iCalendar format fails
+	// Try ISO format: 2023-07-01T122600Z
+	isoLayout := "2006-01-02T150405Z"
+	if len(timeStr) > 0 && timeStr[len(timeStr)-1] != 'Z' {
+		isoLayout = "2006-01-02T150405"
+	}
+
+	return time.Parse(isoLayout, timeStr)
 }
