@@ -28,14 +28,14 @@ for method in "vdir" "icalfile"; do
     fi
 
     # Process all example emails
-    for mail in test/maildir/cur/example-mail-*.eml; do
+    for mail in test/maildir/cur/test-*.eml; do
         # Process the email
         echo
         echo "Processing $mail with $method storage"
 
         # Determine expected exit code based on mail file
         expected_exit_code=0
-        if [[ "$mail" == *"example-mail-15.eml" ]] || [[ "$mail" == *"example-mail-21.eml" ]]; then
+        if [[ "$mail" == *"test-12.eml" ]] || [[ "$mail" == *"test-13.eml" ]]; then
             expected_exit_code=1
         fi
 
