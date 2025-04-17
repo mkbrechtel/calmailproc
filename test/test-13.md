@@ -1,0 +1,22 @@
+# Test 13
+
+Test 13 tests handling of invalid calendar data that violates the iCalendar specification.
+
+## Expected behavior
+
+This test email should be rejected with an error message. We expect an error message like this:
+
+```
+Error: error processing stdin: processing stdin: validation error for event LatiAQ: encoding calendar: encoding calendar: ical: failed to encode "VEVENT": want at most one "URL" property, got 2
+```
+
+The specific error occurs during validation, where the event has multiple URL properties when the iCalendar specification (RFC 5545) allows at most one URL property per event.
+
+When processing this email, the calendar processor should:
+1. Parse the iCalendar data successfully
+2. Validate the event against the iCalendar specification
+3. Detect the violation (multiple URL properties)
+4. Report an appropriate error message
+5. Continue processing other emails without crashing
+
+This test ensures that the calendar processor correctly validates calendar data according to the iCalendar specification and rejects non-compliant events.
