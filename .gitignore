@@ -1,3 +1,5 @@
 calmailproc
 test/out
 invitations.ics
+utils/maildecoder/maildecoder
+utils/maildecoder/attachments/
