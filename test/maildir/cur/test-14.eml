@@ -1,0 +1,38 @@
+From: Trenitalia <webmaster@trenitalia.it>
+To: traveler@example.net
+Message-ID: <-1647807546.3585.1695997649156@app114trnr>
+Subject: =?UTF-8?Q?Reservierung_=C3=A4ndern?=
+MIME-Version: 1.0
+Content-Type: multipart/mixed; 
+	boundary="----=_Part_3584_1728386111.1695997649145"
+
+------=_Part_3584_1728386111.1695997649145
+Content-Type: application/octet-stream; 
+	name=Add_to_calendar-29Sep20238477142316885637464.ics
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; 
+	filename=Add_to_calendar-29Sep20238477142316885637464.ics
+
+BEGIN:VCALENDAR
+VERSION:2.0
+CALSCALE:GREGORIAN
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:e516a376-6363-41d4-a373-23e021395068
+PRIORITY:1
+DTSTART:20230929T165000
+DTEND:20230929T175200
+LOCATION:Bologna Centrale
+DESCRIPTION:Bologna Centrale-Ravenna;
+ Zug: Regionale TTPER 4001, Abfahrt 
+ von Bologna Centrale Uhrzeit: 16:50; Ankunft in Ravenna Uhrzeit: 17:52
+ 
+ORGANIZER:CN=ORGANIZER:mailto:webmaster@trenitalia.it
+SUMMARY:Reise Bologna Centrale-Ravenna, Zug Regionale TTPER 4001, Fahrkart
+ en-Code 2019951724 ,  
+ 
+ATTENDEE;ROLE=REQ-PARTICIPANT;CN=BUYER:mailto:traveler@example.net
+ATTENDEE;ROLE=REQ-PARTICIPANT;CN=TRAVELLER:traveler@example.net
+END:VEVENT
+END:VCALENDAR
+------=_Part_3584_1728386111.1695997649145--
