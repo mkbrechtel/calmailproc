@@ -57,9 +57,15 @@ func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 	// Check for existing event with the same UID
 	existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
 	if err == nil && existingEvent != nil {
-		// Only update if the sequence number is higher or equal (equal for backward compatibility)
-		if parsedEmail.Event.Sequence < existingEvent.Sequence {
-			return fmt.Sprintf("Not processing event with lower sequence number (%d < %d) with UID %s",
+		// Compare events using the event comparison function
+		comparison, err := ical.CompareEvents(parsedEmail.Event, existingEvent)
+		if err != nil {
+			return "Error comparing events", fmt.Errorf("comparing events: %w", err)
+		}
+		
+		// Only update if the new event is newer or equal to the existing one
+		if comparison == ical.SecondEventNewer {
+			return fmt.Sprintf("Not processing older event (sequence: %d vs %d, DTSTAMP comparison) with UID %s",
 				parsedEmail.Event.Sequence, existingEvent.Sequence,
 				parsedEmail.Event.UID), nil
 		} else {
