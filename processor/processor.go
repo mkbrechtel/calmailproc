@@ -54,33 +54,51 @@ func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 			fmt.Errorf("validation error for event %s: %w", parsedEmail.Event.UID, err)
 	}
 
+	// Check if this is a recurring instance update (has RECURRENCE-ID)
+	// We handle instance updates differently from parent event updates
+	isInstanceUpdate := parsedEmail.Event.IsRecurringUpdate()
+
 	// Check for existing event with the same UID
 	existingEvent, err := p.Storage.GetEvent(parsedEmail.Event.UID)
 	if err == nil && existingEvent != nil {
-		// Compare events using the event comparison function
-		comparison, err := ical.CompareEvents(parsedEmail.Event, existingEvent)
-		if err != nil {
-			return "Error comparing events", fmt.Errorf("comparing events: %w", err)
-		}
-		
-		// Only update if the new event is newer or equal to the existing one
-		if comparison == ical.SecondEventNewer {
-			return fmt.Sprintf("Not processing older event (sequence: %d vs %d, DTSTAMP comparison) with UID %s",
-				parsedEmail.Event.Sequence, existingEvent.Sequence,
-				parsedEmail.Event.UID), nil
+		// If this is an instance update, we always process it regardless of parent sequence
+		if isInstanceUpdate {
+			// Handle recurring instance update
+			updatedEvent, err := p.handleRecurringEvent(existingEvent, parsedEmail.Event)
+			if err != nil {
+				return "Error handling recurring instance", fmt.Errorf("handling recurring instance: %w", err)
+			}
+
+			// Validate the updated event
+			if err := ical.ValidateEvent(updatedEvent.RawData); err != nil {
+				return fmt.Sprintf("Invalid calendar data after instance update for event with UID %s", updatedEvent.UID),
+					fmt.Errorf("validation error after instance update for event %s: %w", updatedEvent.UID, err)
+			}
+
+			// Store the updated event
+			if err := p.Storage.StoreEvent(updatedEvent); err != nil {
+				return "Error storing updated event", fmt.Errorf("storing updated event: %w", err)
+			}
+
+			return fmt.Sprintf("Updated recurring event instance with UID %s", parsedEmail.Event.UID), nil
 		} else {
-			// Check if this is a recurring event update
-			if parsedEmail.Event.IsRecurringUpdate() {
-				// Handle recurring event update
-				updatedEvent, err := p.handleRecurringEvent(existingEvent, parsedEmail.Event)
+			// This is a parent event update, not an instance update
+			// Check if the existing event is also a parent or an instance
+			existingIsInstance := existingEvent.IsRecurringUpdate()
+			
+			// If existing event is an instance but new event is a parent,
+			// we should handle them independently
+			if existingIsInstance && !isInstanceUpdate {
+				// Update the parent while preserving instances
+				updatedEvent, err := p.handleParentEventUpdate(existingEvent, parsedEmail.Event)
 				if err != nil {
-					return "Error handling recurring event", fmt.Errorf("handling recurring event: %w", err)
+					return "Error handling parent event update", fmt.Errorf("handling parent event update: %w", err)
 				}
 
 				// Validate the updated event
 				if err := ical.ValidateEvent(updatedEvent.RawData); err != nil {
-					return fmt.Sprintf("Invalid calendar data after update for event with UID %s", updatedEvent.UID),
-						fmt.Errorf("validation error after update for event %s: %w", updatedEvent.UID, err)
+					return fmt.Sprintf("Invalid calendar data after parent update for event with UID %s", updatedEvent.UID),
+						fmt.Errorf("validation error after parent update for event %s: %w", updatedEvent.UID, err)
 				}
 
 				// Store the updated event
@@ -88,11 +106,37 @@ func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 					return "Error storing updated event", fmt.Errorf("storing updated event: %w", err)
 				}
 
-				return fmt.Sprintf("Updated recurring event instance with UID %s", parsedEmail.Event.UID), nil
+				return fmt.Sprintf("Updated parent event while preserving instances with UID %s", parsedEmail.Event.UID), nil
+			}
+			
+			// Regular parent-to-parent comparison
+			comparison, err := ical.CompareEvents(parsedEmail.Event, existingEvent)
+			if err != nil {
+				return "Error comparing events", fmt.Errorf("comparing events: %w", err)
+			}
+			
+			// Only update if the new event is newer or equal to the existing one
+			if comparison == ical.SecondEventNewer {
+				return fmt.Sprintf("Not processing older event (sequence: %d vs %d, DTSTAMP comparison) with UID %s",
+					parsedEmail.Event.Sequence, existingEvent.Sequence,
+					parsedEmail.Event.UID), nil
 			} else {
-				// Store the event with higher/equal sequence
-				if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
-					return "Error storing event", fmt.Errorf("storing event: %w", err)
+				// This is a parent event update that should be processed
+				// We need to handle it while preserving any existing instances
+				updatedEvent, err := p.handleParentEventUpdate(existingEvent, parsedEmail.Event)
+				if err != nil {
+					return "Error handling parent event update", fmt.Errorf("handling parent event update: %w", err)
+				}
+
+				// Validate the updated event
+				if err := ical.ValidateEvent(updatedEvent.RawData); err != nil {
+					return fmt.Sprintf("Invalid calendar data after parent update for event with UID %s", updatedEvent.UID),
+						fmt.Errorf("validation error after parent update for event %s: %w", updatedEvent.UID, err)
+				}
+
+				// Store the updated event
+				if err := p.Storage.StoreEvent(updatedEvent); err != nil {
+					return "Error storing updated event", fmt.Errorf("storing updated event: %w", err)
 				}
 
 				return fmt.Sprintf("Updated event with UID %s, new sequence: %d",
@@ -375,6 +419,88 @@ func (p *Processor) updateAttendeeStatus(event *ical.Event, storageEvent *ical.E
 	// Update the storage event
 	storageEvent.RawData = calBytes
 	return nil
+}
+
+// handleParentEventUpdate processes a parent event update while preserving any
+// existing instance exceptions
+func (p *Processor) handleParentEventUpdate(existingEvent, newEvent *ical.Event) (*ical.Event, error) {
+	// Parse the new parent event data
+	newCal, err := ical.DecodeCalendar(newEvent.RawData)
+	if err != nil {
+		return nil, fmt.Errorf("parsing new parent event data: %w", err)
+	}
+
+	// Parse the existing event data
+	existingCal, err := ical.DecodeCalendar(existingEvent.RawData)
+	if err != nil {
+		return nil, fmt.Errorf("parsing existing event data: %w", err)
+	}
+
+	// Find the parent/master event component in the new calendar
+	var newParentComponent *goical.Component
+	for _, component := range newCal.Children {
+		if component.Name != "VEVENT" {
+			continue
+		}
+		
+		// Parent events don't have RECURRENCE-ID
+		if component.Props.Get("RECURRENCE-ID") == nil {
+			newParentComponent = component
+			break
+		}
+	}
+
+	if newParentComponent == nil {
+		return nil, fmt.Errorf("no parent event component found in update")
+	}
+
+	// Extract all existing instance exceptions
+	var existingInstanceComponents []*goical.Component
+
+	for _, component := range existingCal.Children {
+		if component.Name != "VEVENT" {
+			continue
+		}
+
+		// Separate parent event from instance exceptions
+		if component.Props.Get("RECURRENCE-ID") != nil {
+			// This is an instance exception, preserve it
+			existingInstanceComponents = append(existingInstanceComponents, component)
+		}
+	}
+
+	// Create a new calendar with updated parent event and preserved instances
+	updatedCal := goical.NewCalendar()
+	
+	// Copy the calendar properties
+	for name, props := range newCal.Props {
+		updatedCal.Props[name] = props
+	}
+
+	// Add the updated parent component
+	updatedCal.Children = append(updatedCal.Children, newParentComponent)
+
+	// Add all preserved instance exceptions
+	for _, instance := range existingInstanceComponents {
+		updatedCal.Children = append(updatedCal.Children, instance)
+	}
+
+	// Encode the updated calendar back to bytes
+	calBytes, err := ical.EncodeCalendar(updatedCal)
+	if err != nil {
+		return nil, fmt.Errorf("encoding updated calendar: %w", err)
+	}
+
+	// Create a new event with the updated data
+	updatedEvent := &ical.Event{
+		UID:      existingEvent.UID,
+		RawData:  calBytes,
+		Summary:  newEvent.Summary,
+		Method:   newEvent.Method,
+		Sequence: newEvent.Sequence, // Use the new sequence number from the parent update
+	}
+
+	return updatedEvent, nil
 }
 
 // matchesRecurrenceID checks if two events refer to the same instance
