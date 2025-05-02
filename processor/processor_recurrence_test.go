@@ -2,6 +2,7 @@ package processor
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	goical "github.com/emersion/go-ical"
@@ -282,5 +283,426 @@ func TestMultipleRecurringInstances(t *testing.T) {
 
 	if !foundInstance2 {
 		t.Errorf("Second instance update not found in the calendar")
+	}
+}
+
+// TestParentUpdateSkipsInstances tests the issue described in Test 17
+// where a parent event update with a higher sequence number causes
+// instance updates with lower sequence numbers to be incorrectly skipped
+func TestParentUpdateSkipsInstances(t *testing.T) {
+	// Create processor with in-memory storage
+	store := memory.NewMemoryStorage()
+	proc := NewProcessor(store, false)
+
+	// Test UID for all events
+	uid := "test-recurring-event-issue17"
+
+	// First create parent event with high sequence number (7)
+	parentEmail := `From: organizer@example.com
+To: attendee@example.com
+Subject: Meeting Update (Master)
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary"
+
+--boundary
+Content-Type: text/plain
+
+This is the master event update with sequence 7.
+
+--boundary
+Content-Type: text/calendar; method=REQUEST; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+PRODID:-//Test//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+SUMMARY:Weekly Meeting (Master Update)
+DTSTART:20250505T100000Z
+DTEND:20250505T110000Z
+UID:test-recurring-event-issue17
+SEQUENCE:7
+RRULE:FREQ=WEEKLY;COUNT=5
+ORGANIZER:organizer@example.com
+DTSTAMP:20250501T120000Z
+END:VEVENT
+END:VCALENDAR
+
+--boundary--
+`
+	// Process the parent event first
+	parentResult, err := proc.ProcessEmail(bytes.NewBufferString(parentEmail))
+	if err != nil {
+		t.Fatalf("Failed to process parent email: %v", err)
+	}
+	t.Logf("Parent result: %s", parentResult)
+
+	// Now create and process instance updates with lower sequence numbers
+	instances := []struct {
+		date     string
+		sequence int
+		content  string
+	}{
+		{"20250512", 0, `From: organizer@example.com
+To: attendee@example.com
+Subject: Instance Update 1
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary"
+
+--boundary
+Content-Type: text/plain
+
+This is an instance update with sequence 0.
+
+--boundary
+Content-Type: text/calendar; method=REQUEST; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+PRODID:-//Test//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+SUMMARY:Weekly Meeting (Instance 1)
+DTSTART:20250512T140000Z
+DTEND:20250512T150000Z
+UID:test-recurring-event-issue17
+SEQUENCE:0
+RECURRENCE-ID:20250512T100000Z
+ORGANIZER:organizer@example.com
+DTSTAMP:20250430T120000Z
+END:VEVENT
+END:VCALENDAR
+
+--boundary--
+`},
+		{"20250519", 2, `From: organizer@example.com
+To: attendee@example.com
+Subject: Instance Update 2
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary"
+
+--boundary
+Content-Type: text/plain
+
+This is an instance update with sequence 2.
+
+--boundary
+Content-Type: text/calendar; method=REQUEST; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+PRODID:-//Test//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+SUMMARY:Weekly Meeting (Instance 2)
+DTSTART:20250519T150000Z
+DTEND:20250519T160000Z
+UID:test-recurring-event-issue17
+SEQUENCE:2
+RECURRENCE-ID:20250519T100000Z
+ORGANIZER:organizer@example.com
+DTSTAMP:20250430T130000Z
+END:VEVENT
+END:VCALENDAR
+
+--boundary--
+`},
+		{"20250526", 3, `From: organizer@example.com
+To: attendee@example.com
+Subject: Instance Update 3
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary"
+
+--boundary
+Content-Type: text/plain
+
+This is an instance update with sequence 3.
+
+--boundary
+Content-Type: text/calendar; method=REQUEST; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+PRODID:-//Test//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+SUMMARY:Weekly Meeting (Instance 3)
+DTSTART:20250526T160000Z
+DTEND:20250526T170000Z
+UID:test-recurring-event-issue17
+SEQUENCE:3
+RECURRENCE-ID:20250526T100000Z
+ORGANIZER:organizer@example.com
+DTSTAMP:20250430T140000Z
+END:VEVENT
+END:VCALENDAR
+
+--boundary--
+`},
+	}
+
+	// Process instance updates after the parent update
+	skippedCount := 0
+	for i, inst := range instances {
+		result, err := proc.ProcessEmail(bytes.NewBufferString(inst.content))
+		if err != nil {
+			t.Fatalf("Failed to process instance %d update: %v", i+1, err)
+		}
+		t.Logf("Instance %d result: %s", i+1, result)
+
+		// Check if the instance was skipped
+		if result == fmt.Sprintf("Not processing older event (sequence: %d vs 7, DTSTAMP comparison) with UID %s", 
+			inst.sequence, uid) {
+			skippedCount++
+		}
+	}
+
+	// This test should FAIL because instances should not be skipped
+	// just because the parent has a higher sequence number
+	if skippedCount > 0 {
+		t.Errorf("BUG DETECTED: %d of %d instance updates were incorrectly skipped due to parent's higher sequence number", 
+			skippedCount, len(instances))
+	} else {
+		t.Logf("No bug detected - all instance updates were correctly processed")
+	}
+
+	// Verify the final state of the calendar
+	event, err := store.GetEvent(uid)
+	if err != nil {
+		t.Fatalf("Failed to retrieve event: %v", err)
+	}
+
+	cal, err := ical.DecodeCalendar(event.RawData)
+	if err != nil {
+		t.Fatalf("Failed to parse calendar data: %v", err)
+	}
+
+	// Count the instance exceptions - there should be one for each instance update
+	instanceCount := 0
+	for _, component := range cal.Children {
+		if component.Name != "VEVENT" {
+			continue
+		}
+		if component.Props.Get("RECURRENCE-ID") != nil {
+			instanceCount++
+		}
+	}
+
+	// The calendar should contain all instance exceptions
+	// This test should FAIL because the current implementation drops all instances
+	if instanceCount < len(instances) {
+		t.Errorf("BUG DETECTED: Calendar contains only %d instance exceptions, but should have %d",
+			instanceCount, len(instances))
+	} else {
+		t.Logf("Correct calendar state: contains %d instance exceptions as expected", instanceCount)
+	}
+}
+
+// TestInstancesBeforeParent tests the reverse scenario where instances are processed
+// before the parent - this helps diagnose how the system should work
+func TestInstancesBeforeParent(t *testing.T) {
+	// Create processor with in-memory storage
+	store := memory.NewMemoryStorage()
+	proc := NewProcessor(store, false)
+
+	// Test UID for all events
+	uid := "test-recurring-event-reverse"
+
+	// First create and process instance updates with lower sequence numbers
+	instances := []struct {
+		date     string
+		sequence int
+		content  string
+	}{
+		{"20250512", 0, `From: organizer@example.com
+To: attendee@example.com
+Subject: Instance Update 1
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary"
+
+--boundary
+Content-Type: text/plain
+
+This is an instance update with sequence 0.
+
+--boundary
+Content-Type: text/calendar; method=REQUEST; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+PRODID:-//Test//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+SUMMARY:Weekly Meeting (Instance 1)
+DTSTART:20250512T140000Z
+DTEND:20250512T150000Z
+UID:test-recurring-event-reverse
+SEQUENCE:0
+RECURRENCE-ID:20250512T100000Z
+ORGANIZER:organizer@example.com
+DTSTAMP:20250430T120000Z
+END:VEVENT
+END:VCALENDAR
+
+--boundary--
+`},
+		{"20250519", 2, `From: organizer@example.com
+To: attendee@example.com
+Subject: Instance Update 2
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary"
+
+--boundary
+Content-Type: text/plain
+
+This is an instance update with sequence 2.
+
+--boundary
+Content-Type: text/calendar; method=REQUEST; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+PRODID:-//Test//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+SUMMARY:Weekly Meeting (Instance 2)
+DTSTART:20250519T150000Z
+DTEND:20250519T160000Z
+UID:test-recurring-event-reverse
+SEQUENCE:2
+RECURRENCE-ID:20250519T100000Z
+ORGANIZER:organizer@example.com
+DTSTAMP:20250430T130000Z
+END:VEVENT
+END:VCALENDAR
+
+--boundary--
+`},
+	}
+
+	// Process instance updates first
+	for i, inst := range instances {
+		result, err := proc.ProcessEmail(bytes.NewBufferString(inst.content))
+		if err != nil {
+			t.Fatalf("Failed to process instance %d update: %v", i+1, err)
+		}
+		t.Logf("Instance %d result: %s", i+1, result)
+	}
+
+	// Verify instances were stored before parent
+	beforeEvent, err := store.GetEvent(uid)
+	if err != nil {
+		t.Logf("Event not found before parent update - this is expected for first instance only")
+	} else {
+		beforeCal, err := ical.DecodeCalendar(beforeEvent.RawData)
+		if err != nil {
+			t.Fatalf("Failed to parse calendar data: %v", err)
+		}
+
+		beforeInstanceCount := 0
+		for _, component := range beforeCal.Children {
+			if component.Name == "VEVENT" && component.Props.Get("RECURRENCE-ID") != nil {
+				beforeInstanceCount++
+			}
+		}
+		t.Logf("Before parent update: calendar has %d instance exceptions", beforeInstanceCount)
+	}
+
+	// Now create and process parent event with high sequence number (7)
+	parentEmail := `From: organizer@example.com
+To: attendee@example.com
+Subject: Meeting Update (Master)
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary"
+
+--boundary
+Content-Type: text/plain
+
+This is the master event update with sequence 7.
+
+--boundary
+Content-Type: text/calendar; method=REQUEST; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+BEGIN:VCALENDAR
+PRODID:-//Test//EN
+VERSION:2.0
+METHOD:REQUEST
+BEGIN:VEVENT
+SUMMARY:Weekly Meeting (Master Update)
+DTSTART:20250505T100000Z
+DTEND:20250505T110000Z
+UID:test-recurring-event-reverse
+SEQUENCE:7
+RRULE:FREQ=WEEKLY;COUNT=5
+ORGANIZER:organizer@example.com
+DTSTAMP:20250501T120000Z
+END:VEVENT
+END:VCALENDAR
+
+--boundary--
+`
+	
+	// Process the parent event after the instance updates
+	parentResult, err := proc.ProcessEmail(bytes.NewBufferString(parentEmail))
+	if err != nil {
+		t.Fatalf("Failed to process parent email: %v", err)
+	}
+	t.Logf("Parent result: %s", parentResult)
+
+	// Verify the final state
+	event, err := store.GetEvent(uid)
+	if err != nil {
+		t.Fatalf("Failed to retrieve event: %v", err)
+	}
+
+	cal, err := ical.DecodeCalendar(event.RawData)
+	if err != nil {
+		t.Fatalf("Failed to parse calendar data: %v", err)
+	}
+
+	// Count the master and instance components
+	var masterFound bool
+	var finalInstanceCount int
+
+	for _, component := range cal.Children {
+		if component.Name != "VEVENT" {
+			continue
+		}
+		
+		if component.Props.Get("RECURRENCE-ID") == nil {
+			// This is the master event
+			masterFound = true
+			
+			sequence := component.Props.Get("SEQUENCE")
+			if sequence != nil {
+				t.Logf("Master event sequence: %s", sequence.Value)
+			}
+		} else {
+			// This is an instance
+			finalInstanceCount++
+			recurrenceID := component.Props.Get("RECURRENCE-ID").Value
+			sequence := component.Props.Get("SEQUENCE").Value
+			t.Logf("Found instance with RECURRENCE-ID=%s, SEQUENCE=%s", recurrenceID, sequence)
+		}
+	}
+
+	// Document the current behavior
+	if !masterFound {
+		t.Errorf("Master event not found after parent update")
+	}
+	
+	// Check if instances were preserved or overwritten
+	if finalInstanceCount < len(instances) {
+		t.Logf("CURRENT BEHAVIOR: Parent update overwrote instance updates (instances: %d/%d)",
+			finalInstanceCount, len(instances))
+	} else {
+		t.Logf("CURRENT BEHAVIOR: Instance updates were preserved after parent update")
 	}
 }
