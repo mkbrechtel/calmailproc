@@ -7,6 +7,7 @@ import (
 	"github.com/mkbrechtel/calmailproc/processor"
 	"github.com/mkbrechtel/calmailproc/processor/stdin"
 	"github.com/mkbrechtel/calmailproc/storage"
+	"github.com/mkbrechtel/calmailproc/storage/caldav"
 	"github.com/mkbrechtel/calmailproc/storage/vdir"
 )
 
@@ -14,6 +15,7 @@ import (
 type Config struct {
 	ProcessReplies bool
 	VdirPath      string
+	CalDAV        string
 	Verbose       bool
 }
 
@@ -26,6 +28,8 @@ func ParseFlags() *Config {
 
 	// Storage options
 	flag.StringVar(&config.VdirPath, "vdir", "", "Path to vdir storage directory")
+	flag.StringVar(&config.CalDAV, "caldav", "", "CalDAV URL (e.g., http://user:pass@localhost:5232/calendar/)")
+	
 	flag.BoolVar(&config.Verbose, "verbose", false, "Enable verbose logging output")
 
 	flag.Parse()
@@ -40,7 +44,13 @@ func Run(config *Config) error {
 		err   error
 	)
 
-	if config.VdirPath != "" {
+	if config.CalDAV != "" {
+		// Use CalDAV storage if specified
+		store, err = caldav.NewCalDAVStorageFromURL(config.CalDAV)
+		if err != nil {
+			return fmt.Errorf("error initializing CalDAV storage: %w", err)
+		}
+	} else if config.VdirPath != "" {
 		// Use vdir storage if specified
 		store, err = vdir.NewVDirStorage(config.VdirPath)
 		if err != nil {

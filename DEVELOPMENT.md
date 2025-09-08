@@ -471,6 +471,4 @@ This is especially helpful for understanding the interfaces and functionality pr
 
 ## Important notes for AI agents
 
-Do not modify the end-to-end testing script (`./test.sh`). Only human developers should modify it.
-
 After making changes, ensure all tests pass and the application runs smoothly.

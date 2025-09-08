@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/emersion/go-webdav v0.6.0 // indirect
 	github.com/teambition/rrule-go v1.8.2 // indirect
 	golang.org/x/sys v0.32.0 // indirect
 )
