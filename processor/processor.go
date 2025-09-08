@@ -32,6 +32,10 @@ func (p *Processor) ProcessEmail(r io.Reader) (string, error) {
 
 	// Process the calendar event if one was found (always store if it has a valid UID)
 	if parsedEmail.HasCalendar && parsedEmail.Event.UID != "" {
+		// Validate the UID before processing
+		if err := ical.ValidateUID(parsedEmail.Event.UID); err != nil {
+			return fmt.Sprintf("Invalid UID for calendar event: %v", err), err
+		}
 		// Check if this is a METHOD:REQUEST or METHOD:CANCEL
 		if parsedEmail.Event.Method == "REQUEST" {
 			return p.processEventRequest(parsedEmail)

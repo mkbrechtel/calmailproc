@@ -115,6 +115,10 @@ func ParseICalData(icsData []byte) (*Event, error) {
 		uidProp := component.Props.Get("UID")
 		if uidProp != nil {
 			event.UID = uidProp.Value
+			// Validate the UID
+			if err := ValidateUID(event.UID); err != nil {
+				return nil, fmt.Errorf("invalid UID: %w", err)
+			}
 		} else {
 			// No UID found - this violates the iCalendar standard
 			return nil, fmt.Errorf("VEVENT missing required UID property")

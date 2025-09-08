@@ -1,6 +1,7 @@
 package ical
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -77,6 +78,106 @@ END:VCALENDAR
 			err := ValidateEvent(tt.data)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("TestEventDecodeAndEncode() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateUID(t *testing.T) {
+	tests := []struct {
+		name    string
+		uid     string
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "Valid UID with alphanumeric",
+			uid:     "abc123",
+			wantErr: false,
+		},
+		{
+			name:    "Valid UID with email format",
+			uid:     "user@example.com",
+			wantErr: false,
+		},
+		{
+			name:    "Valid UID with dashes and underscores",
+			uid:     "event-123_test",
+			wantErr: false,
+		},
+		{
+			name:    "Valid UID with dots and colons",
+			uid:     "event.123:test",
+			wantErr: false,
+		},
+		{
+			name:    "Valid UID with plus",
+			uid:     "event+123",
+			wantErr: false,
+		},
+		{
+			name:    "Empty UID",
+			uid:     "",
+			wantErr: true,
+			errMsg:  "UID cannot be empty",
+		},
+		{
+			name:    "UID with 255 characters",
+			uid:     strings.Repeat("a", 255),
+			wantErr: false,
+		},
+		{
+			name:    "UID exceeding 255 characters",
+			uid:     strings.Repeat("a", 256),
+			wantErr: true,
+			errMsg:  "exceeds maximum length",
+		},
+		{
+			name:    "UID with line break",
+			uid:     "event\n123",
+			wantErr: true,
+			errMsg:  "line breaks",
+		},
+		{
+			name:    "UID with carriage return",
+			uid:     "event\r123",
+			wantErr: true,
+			errMsg:  "line breaks",
+		},
+		{
+			name:    "UID with control character",
+			uid:     "event\x00123",
+			wantErr: true,
+			errMsg:  "control characters",
+		},
+		{
+			name:    "UID with forward slash",
+			uid:     "event/123",
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+		{
+			name:    "UID with space",
+			uid:     "event 123",
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+		{
+			name:    "UID with special characters",
+			uid:     "event#123!",
+			wantErr: true,
+			errMsg:  "invalid characters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateUID(tt.uid)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateUID() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err != nil && tt.errMsg != "" && !strings.Contains(err.Error(), tt.errMsg) {
+				t.Errorf("ValidateUID() error message = %v, want message containing %v", err.Error(), tt.errMsg)
 			}
 		})
 	}

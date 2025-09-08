@@ -36,9 +36,9 @@ func (s *VDirStorage) StoreEvent(event *ical.Event) error {
 		return fmt.Errorf("no raw calendar data to store")
 	}
 
-	// Create the event file with a hashed filename and .ics extension
-	hashedUID := HashFilename(event.UID)
-	filename := fmt.Sprintf("%s.ics", hashedUID)
+	// Create the event file with the UID as filename and .ics extension
+	// UID is already validated to be safe for filenames
+	filename := fmt.Sprintf("%s.ics", event.UID)
 	filePath := filepath.Join(s.BasePath, filename)
 
 	// Simply write the raw data to the file, replacing any existing file
@@ -51,9 +51,8 @@ func (s *VDirStorage) StoreEvent(event *ical.Event) error {
 
 // GetEvent retrieves a calendar event from the vdir storage
 func (s *VDirStorage) GetEvent(id string) (*ical.Event, error) {
-	// Find the event file using the hashed ID
-	hashedID := HashFilename(id)
-	filename := fmt.Sprintf("%s.ics", hashedID)
+	// Find the event file using the UID directly
+	filename := fmt.Sprintf("%s.ics", id)
 	filePath := filepath.Join(s.BasePath, filename)
 
 	// Read the file
@@ -113,9 +112,8 @@ func (s *VDirStorage) ListEvents() ([]*ical.Event, error) {
 
 // DeleteEvent deletes a calendar event from the vdir storage
 func (s *VDirStorage) DeleteEvent(id string) error {
-	// Find the event file using the hashed ID
-	hashedID := HashFilename(id)
-	filename := fmt.Sprintf("%s.ics", hashedID)
+	// Find the event file using the UID directly
+	filename := fmt.Sprintf("%s.ics", id)
 	filePath := filepath.Join(s.BasePath, filename)
 
 	// Delete the file

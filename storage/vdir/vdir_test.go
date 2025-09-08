@@ -36,9 +36,8 @@ func TestVDirStoreAndRetrieve(t *testing.T) {
 		t.Fatalf("Failed to store event: %v", err)
 	}
 
-	// Verify the file was created with a hashed name
-	expectedHash := HashFilename(testUID)
-	expectedFilename := expectedHash + ".ics"
+	// Verify the file was created with the UID as filename
+	expectedFilename := testUID + ".ics"
 	expectedPath := filepath.Join(tempDir, expectedFilename)
 	if _, err := os.Stat(expectedPath); os.IsNotExist(err) {
 		t.Errorf("Expected file %s not found", expectedPath)
