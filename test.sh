@@ -15,7 +15,6 @@ cleanup() {
         kill $RADICALE_PID 2>/dev/null || true
         wait $RADICALE_PID 2>/dev/null || true
     fi
-    rm -rf "test/out"
 }
 
 # Set up trap to cleanup on exit
