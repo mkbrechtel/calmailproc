@@ -75,8 +75,12 @@ func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 					fmt.Errorf("validation error after instance update for event %s: %w", updatedEvent.UID, err)
 			}
 
-			// Store the updated event
-			if err := p.Storage.StoreEvent(updatedEvent); err != nil {
+			// Prepare and store the updated event
+			preparedEvent, err := prepareEventForStorage(updatedEvent)
+			if err != nil {
+				return "Error preparing event for storage", fmt.Errorf("preparing event: %w", err)
+			}
+			if err := p.Storage.StoreEvent(preparedEvent); err != nil {
 				return "Error storing updated event", fmt.Errorf("storing updated event: %w", err)
 			}
 
@@ -101,8 +105,12 @@ func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 						fmt.Errorf("validation error after parent update for event %s: %w", updatedEvent.UID, err)
 				}
 
-				// Store the updated event
-				if err := p.Storage.StoreEvent(updatedEvent); err != nil {
+				// Prepare and store the updated event
+				preparedEvent, err := prepareEventForStorage(updatedEvent)
+				if err != nil {
+					return "Error preparing event for storage", fmt.Errorf("preparing event: %w", err)
+				}
+				if err := p.Storage.StoreEvent(preparedEvent); err != nil {
 					return "Error storing updated event", fmt.Errorf("storing updated event: %w", err)
 				}
 
@@ -134,8 +142,12 @@ func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 						fmt.Errorf("validation error after parent update for event %s: %w", updatedEvent.UID, err)
 				}
 
-				// Store the updated event
-				if err := p.Storage.StoreEvent(updatedEvent); err != nil {
+				// Prepare and store the updated event
+				preparedEvent, err := prepareEventForStorage(updatedEvent)
+				if err != nil {
+					return "Error preparing event for storage", fmt.Errorf("preparing event: %w", err)
+				}
+				if err := p.Storage.StoreEvent(preparedEvent); err != nil {
 					return "Error storing updated event", fmt.Errorf("storing updated event: %w", err)
 				}
 
@@ -144,8 +156,12 @@ func (p *Processor) processEvent(parsedEmail *email.Email) (string, error) {
 			}
 		}
 	} else {
-		// No existing event found, store the new one
-		if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
+		// No existing event found, prepare and store the new one
+		preparedEvent, err := prepareEventForStorage(parsedEmail.Event)
+		if err != nil {
+			return "Error preparing event for storage", fmt.Errorf("preparing event: %w", err)
+		}
+		if err := p.Storage.StoreEvent(preparedEvent); err != nil {
 			return "Error storing new event", fmt.Errorf("storing event: %w", err)
 		}
 
@@ -183,8 +199,12 @@ func (p *Processor) processEventReply(parsedEmail *email.Email) (string, error) 
 		if err := p.updateAttendeeStatus(parsedEmail.Event, existingEvent); err != nil {
 			fmt.Printf("Warning: Failed to update attendee status: %v\n", err)
 
-			// If attendee update fails, store the event normally
-			if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
+			// If attendee update fails, prepare and store the event normally
+			preparedEvent, err := prepareEventForStorage(parsedEmail.Event)
+			if err != nil {
+				return "Error preparing event for storage", fmt.Errorf("preparing event: %w", err)
+			}
+			if err := p.Storage.StoreEvent(preparedEvent); err != nil {
 				return "Error storing reply event", fmt.Errorf("storing event: %w", err)
 			}
 
@@ -197,8 +217,12 @@ func (p *Processor) processEventReply(parsedEmail *email.Email) (string, error) 
 					fmt.Errorf("validation error after attendee update for event %s: %w", existingEvent.UID, err)
 			}
 
-			// Store the updated event
-			if err := p.Storage.StoreEvent(existingEvent); err != nil {
+			// Prepare and store the updated event
+			preparedEvent, err := prepareEventForStorage(existingEvent)
+			if err != nil {
+				return "Error preparing event for storage", fmt.Errorf("preparing event: %w", err)
+			}
+			if err := p.Storage.StoreEvent(preparedEvent); err != nil {
 				return "Error storing updated event with attendee status", fmt.Errorf("storing updated event: %w", err)
 			}
 
@@ -206,8 +230,12 @@ func (p *Processor) processEventReply(parsedEmail *email.Email) (string, error) 
 				parsedEmail.Event.UID), nil
 		}
 	} else {
-		// No existing event found, store the new one
-		if err := p.Storage.StoreEvent(parsedEmail.Event); err != nil {
+		// No existing event found, prepare and store the new one
+		preparedEvent, err := prepareEventForStorage(parsedEmail.Event)
+		if err != nil {
+			return "Error preparing event for storage", fmt.Errorf("preparing event: %w", err)
+		}
+		if err := p.Storage.StoreEvent(preparedEvent); err != nil {
 			return "Error storing new reply event", fmt.Errorf("storing event: %w", err)
 		}
 
@@ -531,4 +559,29 @@ func existingEventSequence(store storage.Storage, uid string) int {
 		return existingEvent.Sequence
 	}
 	return -1 // Return -1 if event doesn't exist or there's an error
+}
+
+// prepareEventForStorage removes the METHOD property from an event before storing
+// This ensures the stored calendar data doesn't contain METHOD which is only for transport
+func prepareEventForStorage(event *ical.Event) (*ical.Event, error) {
+	// Decode the calendar data
+	cal, err := ical.DecodeCalendar(event.RawData)
+	if err != nil {
+		return nil, fmt.Errorf("decoding calendar: %w", err)
+	}
+	
+	// Remove the METHOD property
+	cal.Props.Del("METHOD")
+	
+	// Re-encode the calendar
+	rawData, err := ical.EncodeCalendar(cal)
+	if err != nil {
+		return nil, fmt.Errorf("encoding calendar: %w", err)
+	}
+	
+	// Create a new event with the modified data
+	preparedEvent := *event
+	preparedEvent.RawData = rawData
+	
+	return &preparedEvent, nil
 }
