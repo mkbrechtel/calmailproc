@@ -75,6 +75,46 @@ if [ "$file_count" != "$maildir_count" ]; then
 fi
 
 echo
+echo "=== Comparing vdir outputs ==="
+echo "Comparing maildir mode output with single imports..."
+
+# Compare the actual ICS files content
+comparison_failed=false
+for ics_file in test/out/vdir-single-imports/*.ics; do
+    basename=$(basename "$ics_file")
+    maildir_file="test/out/vdir-from-maildir/$basename"
+    
+    if [ -f "$maildir_file" ]; then
+        if ! diff -q "$ics_file" "$maildir_file" >/dev/null 2>&1; then
+            echo "✗ Content differs: $basename"
+            echo "  Differences:"
+            diff "$ics_file" "$maildir_file" | head -20 || true
+            comparison_failed=true
+        fi
+    else
+        echo "✗ Missing in maildir output: $basename"
+        comparison_failed=true
+    fi
+done
+
+# Check for extra files in maildir output
+for ics_file in test/out/vdir-from-maildir/*.ics; do
+    basename=$(basename "$ics_file")
+    single_file="test/out/vdir-single-imports/$basename"
+    
+    if [ ! -f "$single_file" ]; then
+        echo "✗ Extra file in maildir output: $basename"
+        comparison_failed=true
+    fi
+done
+
+if [ "$comparison_failed" = false ]; then
+    echo "✓ vdir outputs match perfectly!"
+else
+    echo "⚠ Warning: vdir outputs have differences"
+fi
+
+echo
 echo "=== Testing CalDAV storage ==="
 
 # Start Xandikos server
@@ -106,13 +146,7 @@ args="-process-replies -caldav $caldav_url"
 
 # Process all example emails with CalDAV
 for mail in test/maildir/cur/test-*.eml; do
-    # Skip test 16 in CalDAV mode
-    if [[ "$mail" == *"test-16-"*.eml ]]; then
-        echo
-        echo "Skipping $mail in CalDAV mode"
-        continue
-    fi
-    
+ 
     # Process the email
     echo
     echo "Processing $mail with CalDAV storage"
@@ -149,6 +183,20 @@ event_count=$(curl -s -X PROPFIND http://localhost:15232/user/calendar/ \
     -d '<?xml version="1.0" encoding="utf-8"?><propfind xmlns="DAV:"><prop><resourcetype/></prop></propfind>' \
     | grep -c 'href>.*\.ics' || echo "0")
 echo "CalDAV: Found $event_count calendar events"
+
+echo
+echo "=== Comparing CalDAV outputs with vdir ==="
+
+# Compare event counts
+vdir_count=$(find "test/out/vdir-single-imports" -type f -name "*.ics" | wc -l)
+echo "vdir (single imports): $vdir_count events"
+echo "CalDAV: $event_count events"
+
+if [ "$vdir_count" = "$event_count" ]; then
+    echo "✓ CalDAV event count matches vdir!"
+else
+    echo "✗ CalDAV event count ($event_count) differs from vdir ($vdir_count)"
+fi
 
 echo
 echo "✅ All tests passed!"
