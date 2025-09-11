@@ -24,9 +24,12 @@ trap cleanup EXIT
 rm -rf "test/out"
 mkdir -p "test/out/caldav"
 
-echo "=== Testing vdir storage ==="
+echo "=== Testing maildir mode ==="
+$calmailproc -process-replies -maildir test/maildir -vdir test/out/vdir-from-maildir -verbose
 
-storage_dir="test/out/vdir"
+echo
+echo "=== Testing vdir storage (single file imports) ==="
+storage_dir="test/out/vdir-single-imports"
 args="-process-replies -vdir $storage_dir"
 
 # Process all example emails
@@ -58,9 +61,18 @@ for mail in test/maildir/cur/test-*.eml; do
     fi
 done
 
-# Simple verification for vdir
+# Verify vdir storage
 file_count=$(find "$storage_dir" -type f | wc -l)
-echo "vdir: Found $file_count calendar files"
+echo "vdir (single imports): Found $file_count calendar files"
+
+# Compare maildir and single-import results
+maildir_count=$(find "test/out/vdir-from-maildir" -type f | wc -l)
+echo "vdir (from maildir): Found $maildir_count calendar files"
+
+if [ "$file_count" != "$maildir_count" ]; then
+    echo "✗ ERROR: File count mismatch between maildir ($maildir_count) and single imports ($file_count)"
+    exit 1
+fi
 
 echo
 echo "=== Testing CalDAV storage ==="

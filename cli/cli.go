@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/mkbrechtel/calmailproc/processor"
+	"github.com/mkbrechtel/calmailproc/processor/maildir"
 	"github.com/mkbrechtel/calmailproc/processor/stdin"
 	"github.com/mkbrechtel/calmailproc/storage"
 	"github.com/mkbrechtel/calmailproc/storage/caldav"
@@ -16,6 +17,7 @@ type Config struct {
 	ProcessReplies bool
 	VdirPath      string
 	CalDAV        string
+	MaildirPath   string
 	Verbose       bool
 }
 
@@ -30,6 +32,8 @@ func ParseFlags() *Config {
 	flag.StringVar(&config.VdirPath, "vdir", "", "Path to vdir storage directory")
 	flag.StringVar(&config.CalDAV, "caldav", "", "CalDAV URL (e.g., http://user:pass@localhost:5232/calendar/)")
 	
+	// Input options
+	flag.StringVar(&config.MaildirPath, "maildir", "", "Path to maildir to process (will process all emails recursively)")
 	flag.BoolVar(&config.Verbose, "verbose", false, "Enable verbose logging output")
 
 	flag.Parse()
@@ -68,7 +72,15 @@ func Run(config *Config) error {
 	// Initialize the processor
 	proc := processor.NewProcessor(store, config.ProcessReplies)
 
-	// Process from stdin
+	// Process maildir if specified
+	if config.MaildirPath != "" {
+		if err := maildir.Process(config.MaildirPath, proc, config.Verbose); err != nil {
+			return fmt.Errorf("error processing maildir: %w", err)
+		}
+		return nil
+	}
+
+	// Default: process from stdin
 	if err := stdin.Process(proc); err != nil {
 		return fmt.Errorf("error processing stdin: %w", err)
 	}
