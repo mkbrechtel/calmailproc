@@ -181,7 +181,7 @@ event_count=$(curl -s -X PROPFIND http://localhost:15232/user/calendar/ \
     -H "Depth: 1" \
     -H "Content-Type: application/xml" \
     -d '<?xml version="1.0" encoding="utf-8"?><propfind xmlns="DAV:"><prop><resourcetype/></prop></propfind>' \
-    | grep -c 'href>.*\.ics' || echo "0")
+    | grep -o 'href>[^<]*\.ics' | wc -l)
 echo "CalDAV: Found $event_count calendar events"
 
 echo
