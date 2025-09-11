@@ -6,14 +6,14 @@
 set -e
 
 calmailproc="go run main.go"
-RADICALE_PID=""
+XANDIKOS_PID=""
 
-# Cleanup function to ensure Radicale is stopped
+# Cleanup function to ensure Xandikos is stopped
 cleanup() {
-    if [ -n "$RADICALE_PID" ]; then
-        echo "Stopping Radicale server (PID: $RADICALE_PID)..."
-        kill $RADICALE_PID 2>/dev/null || true
-        wait $RADICALE_PID 2>/dev/null || true
+    if [ -n "$XANDIKOS_PID" ]; then
+        echo "Stopping Xandikos server (PID: $XANDIKOS_PID)..."
+        kill $XANDIKOS_PID 2>/dev/null || true
+        wait $XANDIKOS_PID 2>/dev/null || true
     fi
 }
 
@@ -22,7 +22,7 @@ trap cleanup EXIT
 
 # Clean up test directories
 rm -rf "test/out"
-mkdir -p "test/out/caldav"
+mkdir -p "test/out/xandikos"
 
 echo "=== Testing maildir mode ==="
 $calmailproc -process-replies -maildir test/maildir -vdir test/out/vdir-from-maildir -verbose
@@ -77,32 +77,31 @@ fi
 echo
 echo "=== Testing CalDAV storage ==="
 
-# Start Radicale server
-echo "Starting Radicale CalDAV server..."
-radicale --storage-filesystem-folder=./test/out/caldav \
-         --auth-type=none \
-         --hosts='localhost:15232' &
-RADICALE_PID=$!
+# Start Xandikos server
+echo "Starting Xandikos CalDAV server..."
+xandikos -d ./test/out/xandikos --autocreate -l localhost -p 15232 --no-detect-systemd &
+XANDIKOS_PID=$!
 
-# Wait for Radicale to start
-echo "Waiting for Radicale to start..."
+# Wait for Xandikos to start
+echo "Waiting for Xandikos to start..."
 for i in {1..10}; do
     if curl -s -f http://localhost:15232/ >/dev/null 2>&1; then
-        echo "Radicale is ready"
+        echo "Xandikos is ready"
         break
     fi
     if [ $i -eq 10 ]; then
-        echo "ERROR: Radicale failed to start"
+        echo "ERROR: Xandikos failed to start"
         exit 1
     fi
     sleep 0.5
 done
 
-# Create test calendar
+# Create test calendar - Xandikos uses /user/ prefix
 echo "Creating test calendar..."
-curl -X MKCALENDAR http://test:pass@localhost:15232/test/calendar/ >/dev/null 2>&1 || true
+curl -X MKCOL http://localhost:15232/user/ >/dev/null 2>&1 || true
+curl -X MKCALENDAR http://localhost:15232/user/calendar/ >/dev/null 2>&1 || true
 
-caldav_url="http://test:pass@localhost:15232/test/calendar/"
+caldav_url="http://test:pass@localhost:15232/user/calendar/"
 args="-process-replies -caldav $caldav_url"
 
 # Process all example emails with CalDAV
@@ -144,13 +143,11 @@ done
 # Verify CalDAV storage
 echo
 echo "Verifying CalDAV storage..."
-event_count=$(curl -s -X PROPFIND http://test:pass@localhost:15232/test/calendar/ \
+event_count=$(curl -s -X PROPFIND http://localhost:15232/user/calendar/ \
     -H "Depth: 1" \
     -H "Content-Type: application/xml" \
     -d '<?xml version="1.0" encoding="utf-8"?><propfind xmlns="DAV:"><prop><resourcetype/></prop></propfind>' \
-    | grep -o '<response>' | wc -l)
-# Subtract 1 for the collection itself
-event_count=$((event_count - 1))
+    | grep -c 'href>.*\.ics' || echo "0")
 echo "CalDAV: Found $event_count calendar events"
 
 echo
