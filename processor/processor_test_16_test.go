@@ -4,13 +4,13 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mkbrechtel/calmailproc/storage/memory"
+	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 // TestProcessorTest16InvalidDTSTAMPFormat tests handling of calendar events with non-standard formatted DTSTAMP values
 func TestProcessorTest16InvalidDTSTAMPFormat(t *testing.T) {
 	// Create an in-memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	processor := NewProcessor(store, true)
 
 	// Part 1: First email should be processed successfully

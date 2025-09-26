@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/mkbrechtel/calmailproc/processor"
-	"github.com/mkbrechtel/calmailproc/storage/memory"
+	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 func TestProcessReader(t *testing.T) {
 	// Create a test memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	
 	// Create processor
 	proc := processor.NewProcessor(store, true)

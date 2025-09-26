@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/mkbrechtel/calmailproc/processor"
-	"github.com/mkbrechtel/calmailproc/storage/memory"
+	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 func TestProcess_InvalidPath(t *testing.T) {
 	// Create a processor with memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	proc := processor.NewProcessor(store, true)
 
 	// Test with a non-existent path
@@ -30,7 +30,7 @@ func TestProcess_ExistingMaildir(t *testing.T) {
 	}
 
 	// Create a processor with memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	proc := processor.NewProcessor(store, true)
 
 	// Process the test maildir
@@ -55,7 +55,7 @@ func TestProcess_MalformedEmails(t *testing.T) {
 	testMaildir := "../../test/maildir"
 	
 	// Create a processor with memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	proc := processor.NewProcessor(store, true)
 	
 	// Process the test maildir with verbose mode to see outputs

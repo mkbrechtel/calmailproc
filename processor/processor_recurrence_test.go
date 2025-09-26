@@ -7,13 +7,13 @@ import (
 
 	goical "github.com/emersion/go-ical"
 	"github.com/mkbrechtel/calmailproc/parser/ical"
-	"github.com/mkbrechtel/calmailproc/storage/memory"
+	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 // TestProcessEmail_RecurringEvent tests processing recurring event updates
 func TestProcessEmail_RecurringEvent(t *testing.T) {
 	// Create processor with in-memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	proc := NewProcessor(store, true)
 
 	// Store a base recurring event first
@@ -217,7 +217,7 @@ func TestMultipleRecurringInstances(t *testing.T) {
 	}
 
 	// Store the event
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	err = store.StoreEvent(event)
 	if err != nil {
 		t.Fatalf("Failed to store multi-instance event: %v", err)
@@ -291,7 +291,7 @@ func TestMultipleRecurringInstances(t *testing.T) {
 // instance updates with lower sequence numbers to be incorrectly skipped
 func TestParentUpdateSkipsInstances(t *testing.T) {
 	// Create processor with in-memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	proc := NewProcessor(store, false)
 
 	// Test UID for all events
@@ -506,7 +506,7 @@ END:VCALENDAR
 // before the parent - this helps diagnose how the system should work
 func TestInstancesBeforeParent(t *testing.T) {
 	// Create processor with in-memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	proc := NewProcessor(store, false)
 
 	// Test UID for all events

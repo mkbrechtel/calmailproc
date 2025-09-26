@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/mkbrechtel/calmailproc/parser/ical"
-	"github.com/mkbrechtel/calmailproc/storage/memory"
+	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 func TestProcessorTest04DuplicateEvents(t *testing.T) {
 	// Create an in-memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	processor := NewProcessor(store, true)
 
 	// Read first invitation mail

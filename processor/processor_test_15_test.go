@@ -4,12 +4,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/mkbrechtel/calmailproc/storage/memory"
+	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 func TestProcessorTest15DuplicateDTSTAMP(t *testing.T) {
 	// Create an in-memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	processor := NewProcessor(store, true)
 
 	// Read the email file containing iCalendar data with duplicate DTSTAMP properties

@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/mkbrechtel/calmailproc/parser/ical"
-	"github.com/mkbrechtel/calmailproc/storage/memory"
+	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 func TestProcessorTest11OutOfSequenceMail(t *testing.T) {
 	// Create an in-memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	processor := NewProcessor(store, true)
 
 	// Read request mail (chronologically was sent first, but we process it after the cancel)
@@ -52,7 +52,7 @@ func TestProcessorTest11OutOfSequenceMail(t *testing.T) {
 
 	// Now test reverse order: if we process cancel and then request (maildir order)
 	// Test reset
-	store = memory.NewMemoryStorage()
+	store = storage.NewMemoryStorage()
 	processor = NewProcessor(store, true)
 
 	// Read cancellation mail again

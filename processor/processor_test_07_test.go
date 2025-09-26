@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/mkbrechtel/calmailproc/parser/ical"
-	"github.com/mkbrechtel/calmailproc/storage/memory"
+	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 func TestProcessorTest07SequentialUpdates(t *testing.T) {
 	// Create an in-memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	processor := NewProcessor(store, true)
 
 	// 1. Process the original event (sequence 0)
@@ -190,7 +190,7 @@ func TestProcessorTest07SequentialUpdates(t *testing.T) {
 
 	// Now test processing out of order but with correct sequence preference
 	// Reset storage
-	storeOutOfOrder := memory.NewMemoryStorage()
+	storeOutOfOrder := storage.NewMemoryStorage()
 	processorOutOfOrder := NewProcessor(storeOutOfOrder, true)
 
 	// 1. Process update with sequence 4 first

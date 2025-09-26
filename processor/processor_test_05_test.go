@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/mkbrechtel/calmailproc/parser/ical"
-	"github.com/mkbrechtel/calmailproc/storage/memory"
+	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 func TestProcessorTest05InvitationAndResponse(t *testing.T) {
 	// First test with process-replies=true (replies should be processed)
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	processor := NewProcessor(store, true)
 
 	// Read invitation mail
@@ -155,7 +155,7 @@ func TestProcessorTest05InvitationAndResponse(t *testing.T) {
 	}
 
 	// Now test with process-replies=false (replies should be ignored)
-	storeNoReplies := memory.NewMemoryStorage()
+	storeNoReplies := storage.NewMemoryStorage()
 	processorNoReplies := NewProcessor(storeNoReplies, false)
 
 	// Re-read and process the invitation mail

@@ -1,4 +1,4 @@
-package caldav
+package storage
 
 import (
 	"bytes"

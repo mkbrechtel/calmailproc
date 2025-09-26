@@ -8,7 +8,7 @@ import (
 
 	"github.com/mkbrechtel/calmailproc/parser/email"
 	"github.com/mkbrechtel/calmailproc/parser/ical"
-	"github.com/mkbrechtel/calmailproc/storage/memory"
+	"github.com/mkbrechtel/calmailproc/storage"
 )
 
 // TestExtractRecurrenceIDs extracts RECURRENCE-ID and sequence information from test files
@@ -71,7 +71,7 @@ func TestExtractRecurrenceIDs(t *testing.T) {
 // handled independently from the parent event, even when the parent has a higher sequence number.
 func TestRecurringInstancesWithParent(t *testing.T) {
 	// Create processor with in-memory storage
-	store := memory.NewMemoryStorage()
+	store := storage.NewMemoryStorage()
 	proc := NewProcessor(store, false)
 	
 	// Path to test emails
