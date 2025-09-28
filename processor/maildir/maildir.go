@@ -8,7 +8,15 @@ import (
 	"github.com/mkbrechtel/calmailproc/processor"
 )
 
-// Process processes all emails in a maildir and its subfolders
+type MaildirConfig struct {
+	Path    string `yaml:"path"`
+	Verbose bool   `yaml:"verbose"`
+}
+
+func ProcessWithConfig(config MaildirConfig, proc *processor.Processor) error {
+	return Process(config.Path, proc, config.Verbose)
+}
+
 func Process(maildirPath string, proc *processor.Processor, verbose bool) error {
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Starting to process maildir: %s\n", maildirPath)

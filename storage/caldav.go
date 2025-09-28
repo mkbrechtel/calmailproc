@@ -14,14 +14,22 @@ import (
 	icalParser "github.com/mkbrechtel/calmailproc/parser/ical"
 )
 
-// CalDAVStorage implements the storage.Storage interface using CalDAV
+type WebdavConfig struct {
+	URL      string `yaml:"url"`
+	User     string `yaml:"user"`
+	Pass     string `yaml:"pass"`
+	Calendar string `yaml:"calendar"`
+}
+
 type CalDAVStorage struct {
 	client       *caldav.Client
 	calendarPath string
 }
 
-// NewCalDAVStorageFromURL creates a new CalDAVStorage from a single URL with embedded credentials
-// Format: http://user:pass@host:port/path/to/calendar/
+func NewCalDAVStorageFromConfig(config WebdavConfig) (*CalDAVStorage, error) {
+	return NewCalDAVStorage(config.URL, config.User, config.Pass, config.Calendar)
+}
+
 func NewCalDAVStorageFromURL(fullURL string) (*CalDAVStorage, error) {
 	// Parse the URL
 	u, err := url.Parse(fullURL)

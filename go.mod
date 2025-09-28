@@ -9,4 +9,9 @@ require (
 	github.com/emersion/go-webdav v0.6.0
 )
 
-require github.com/teambition/rrule-go v1.8.2 // indirect
+require (
+	github.com/adrg/xdg v0.5.3 // indirect
+	github.com/teambition/rrule-go v1.8.2 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)

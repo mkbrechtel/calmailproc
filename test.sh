@@ -42,6 +42,7 @@ echo "Creating test calendars..."
 curl -X MKCOL http://localhost:15232/user/ >/dev/null 2>&1 || true
 curl -X MKCALENDAR http://localhost:15232/user/calendar1/ >/dev/null 2>&1 || true
 curl -X MKCALENDAR http://localhost:15232/user/calendar2/ >/dev/null 2>&1 || true
+curl -X MKCALENDAR http://localhost:15232/user/calendar3/ >/dev/null 2>&1 || true
 
 echo
 echo "=== Testing CalDAV storage (calendar1) ==="
@@ -106,6 +107,59 @@ if [ "$event_count1" = "$event_count2" ]; then
     echo "✓ Maildir and stdin modes produce same results!"
 else
     echo "✗ Event count mismatch: calendar1=$event_count1, calendar2=$event_count2"
+    exit 1
+fi
+
+echo
+echo "=== Testing config file mode (calendar3) ==="
+
+config_file="test/config/calmailproc/config.yaml"
+temp_config="/tmp/calmailproc-test-config.yaml"
+cat > "$temp_config" << EOF
+webdav:
+  url: http://localhost:15232
+  user: test
+  pass: pass
+  calendar: /user/calendar3/
+
+processor:
+  process_replies: true
+
+maildir:
+  path: test/maildir
+  verbose: true
+EOF
+
+echo "Using test config (temporary override):"
+cat "$temp_config"
+
+echo
+echo "Processing maildir with config file..."
+mkdir -p test/config/calmailproc
+cp "$temp_config" test/config/calmailproc/config.yaml
+XDG_CONFIG_HOME="$(pwd)/test/config" $calmailproc
+rm "$temp_config"
+
+echo
+echo "Verifying CalDAV storage (calendar3)..."
+event_count3=$(curl -s -X PROPFIND http://localhost:15232/user/calendar3/ \
+    -H "Depth: 1" \
+    -H "Content-Type: application/xml" \
+    -d '<?xml version="1.0" encoding="utf-8"?><propfind xmlns="DAV:"><prop><resourcetype/></prop></propfind>' \
+    | grep -o 'href>[^<]*\.ics' | wc -l)
+echo "CalDAV calendar3: Found $event_count3 calendar events"
+
+echo
+echo "=== Comparing all results ==="
+echo "Calendar1 (stdin mode):    $event_count1 events"
+echo "Calendar2 (maildir mode):  $event_count2 events"
+echo "Calendar3 (config file):   $event_count3 events"
+
+if [ "$event_count1" = "$event_count2" ] && [ "$event_count2" = "$event_count3" ]; then
+    echo "✓ All three calendars have same event count!"
+    echo "✓ All modes produce same results!"
+else
+    echo "✗ Event count mismatch: calendar1=$event_count1, calendar2=$event_count2, calendar3=$event_count3"
     exit 1
 fi
 

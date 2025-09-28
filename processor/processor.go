@@ -11,10 +11,13 @@ import (
 	"github.com/mkbrechtel/calmailproc/storage"
 )
 
-// Processor handles processing emails with calendar events
+type ProcessorConfig struct {
+	ProcessReplies bool `yaml:"process_replies"`
+}
+
 type Processor struct {
 	Storage        storage.Storage
-	ProcessReplies bool // Whether to process METHOD:REPLY to update attendee status
+	ProcessReplies bool
 }
 
 func NewProcessor(storage storage.Storage, processReplies bool) *Processor {
@@ -22,6 +25,10 @@ func NewProcessor(storage storage.Storage, processReplies bool) *Processor {
 		Storage:        storage,
 		ProcessReplies: processReplies,
 	}
+}
+
+func NewProcessorFromConfig(storage storage.Storage, config ProcessorConfig) *Processor {
+	return NewProcessor(storage, config.ProcessReplies)
 }
 
 func (p *Processor) ProcessEmail(r io.Reader) (string, error) {

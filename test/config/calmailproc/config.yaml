@@ -1,0 +1,12 @@
+webdav:
+  url: http://localhost:5232
+  user: myuser
+  pass: mypass
+  calendar: /user/calendar/
+
+processor:
+  process_replies: false
+
+maildir:
+  path: ""
+  verbose: false
