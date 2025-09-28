@@ -1,5 +1,6 @@
 calmailproc
 test/out
+test/calmailproc
 !test/config
 invitations.ics
 utils/maildecoder/maildecoder

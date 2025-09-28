@@ -5,7 +5,10 @@
 #
 set -e
 
-calmailproc="go run main.go"
+echo "=== Building calmailproc binary ==="
+go build -o test/calmailproc main.go
+
+calmailproc="./test/calmailproc"
 XANDIKOS_PID=""
 
 cleanup() {
@@ -39,15 +42,15 @@ for i in {1..10}; do
 done
 
 echo "Creating test calendars..."
-curl -X MKCOL http://localhost:15232/user/ >/dev/null 2>&1 || true
-curl -X MKCALENDAR http://localhost:15232/user/calendar1/ >/dev/null 2>&1 || true
-curl -X MKCALENDAR http://localhost:15232/user/calendar2/ >/dev/null 2>&1 || true
-curl -X MKCALENDAR http://localhost:15232/user/calendar3/ >/dev/null 2>&1 || true
+#curl -X MKCOL http://localhost:15232/user/ >/dev/null 2>&1 || true
+curl -X MKCALENDAR http://localhost:15232/user/calendars/calendar1/ >/dev/null 2>&1 || true
+curl -X MKCALENDAR http://localhost:15232/user/calendars/calendar2/ >/dev/null 2>&1 || true
+curl -X MKCALENDAR http://localhost:15232/user/calendars/calendar3/ >/dev/null 2>&1 || true
 
 echo
 echo "=== Testing CalDAV storage (calendar1) ==="
 
-caldav_args1="-process-replies -url http://localhost:15232 -user test -pass pass -calendar /user/calendar1/"
+caldav_args1="-process-replies -url http://localhost:15232 -user test -pass pass -calendar /user/calendars/calendar1/"
 
 for mail in test/maildir/cur/test-*.eml; do
     echo
@@ -75,7 +78,7 @@ done
 
 echo
 echo "Verifying CalDAV storage (calendar1)..."
-event_count1=$(curl -s -X PROPFIND http://localhost:15232/user/calendar1/ \
+event_count1=$(curl -s -X PROPFIND http://localhost:15232/user/calendars/calendar1/ \
     -H "Depth: 1" \
     -H "Content-Type: application/xml" \
     -d '<?xml version="1.0" encoding="utf-8"?><propfind xmlns="DAV:"><prop><resourcetype/></prop></propfind>' \
@@ -85,12 +88,12 @@ echo "CalDAV calendar1: Found $event_count1 calendar events"
 echo
 echo "=== Testing maildir mode (calendar2) ==="
 
-caldav_args2="-process-replies -url http://localhost:15232 -user test -pass pass -calendar /user/calendar2/"
+caldav_args2="-process-replies -url http://localhost:15232 -user test -pass pass -calendar /user/calendars/calendar2/"
 $calmailproc -process-replies -maildir test/maildir $caldav_args2 -verbose
 
 echo
 echo "Verifying CalDAV storage (calendar2)..."
-event_count2=$(curl -s -X PROPFIND http://localhost:15232/user/calendar2/ \
+event_count2=$(curl -s -X PROPFIND http://localhost:15232/user/calendars/calendar2/ \
     -H "Depth: 1" \
     -H "Content-Type: application/xml" \
     -d '<?xml version="1.0" encoding="utf-8"?><propfind xmlns="DAV:"><prop><resourcetype/></prop></propfind>' \
@@ -113,36 +116,15 @@ fi
 echo
 echo "=== Testing config file mode (calendar3) ==="
 
-config_file="test/config/calmailproc/config.yaml"
-temp_config="/tmp/calmailproc-test-config.yaml"
-cat > "$temp_config" << EOF
-webdav:
-  url: http://localhost:15232
-  user: test
-  pass: pass
-  calendar: /user/calendar3/
-
-processor:
-  process_replies: true
-
-maildir:
-  path: test/maildir
-  verbose: true
-EOF
-
-echo "Using test config (temporary override):"
-cat "$temp_config"
+echo "Using config from test/config/calmailproc/config.yaml"
 
 echo
 echo "Processing maildir with config file..."
-mkdir -p test/config/calmailproc
-cp "$temp_config" test/config/calmailproc/config.yaml
 XDG_CONFIG_HOME="$(pwd)/test/config" $calmailproc
-rm "$temp_config"
 
 echo
 echo "Verifying CalDAV storage (calendar3)..."
-event_count3=$(curl -s -X PROPFIND http://localhost:15232/user/calendar3/ \
+event_count3=$(curl -s -X PROPFIND http://localhost:15232/user/calendars/calendar3/ \
     -H "Depth: 1" \
     -H "Content-Type: application/xml" \
     -d '<?xml version="1.0" encoding="utf-8"?><propfind xmlns="DAV:"><prop><resourcetype/></prop></propfind>' \
