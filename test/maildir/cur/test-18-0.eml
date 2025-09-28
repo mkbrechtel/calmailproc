@@ -1,0 +1,51 @@
+Return-Path: <test@example.com>
+Delivered-To: test
+Received: from localhost
+Date: Mon, 15 Sep 2025 09:00:00 +0000
+From: Test Organizer <test@example.com>
+To: attendee@example.com
+Subject: Test 18 - Instance Update
+Message-ID: <synthetic-test18-instance@example.com>
+Content-Type: multipart/alternative;
+	boundary="_synth_test18_instance_"
+MIME-Version: 1.0
+
+--_synth_test18_instance_
+Content-Type: text/plain; charset="utf-8"
+
+Instance update for Oct 3rd
+
+--_synth_test18_instance_
+Content-Type: text/calendar; charset="utf-8"; method=REQUEST
+
+BEGIN:VCALENDAR
+METHOD:REQUEST
+PRODID:Synthetic Test
+VERSION:2.0
+BEGIN:VTIMEZONE
+TZID:UTC
+BEGIN:STANDARD
+DTSTART:16010101T000000
+TZOFFSETFROM:+0000
+TZOFFSETTO:+0000
+END:STANDARD
+END:VTIMEZONE
+BEGIN:VEVENT
+ORGANIZER:MAILTO:test@example.com
+ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:MAILTO:attendee@example.com
+UID:synthetic-test18-event@example.com
+RECURRENCE-ID;TZID=UTC:20251003T100000Z
+SUMMARY:Test 18 - Weekly Meeting
+DESCRIPTION:Instance update for Oct 3rd\n
+DTSTART;TZID=UTC:20251003T110000
+DTEND;TZID=UTC:20251003T120000
+CLASS:PUBLIC
+STATUS:CONFIRMED
+SEQUENCE:2
+PRIORITY:5
+DTSTAMP:20250915T090000Z
+TRANSP:OPAQUE
+END:VEVENT
+END:VCALENDAR
+
+--_synth_test18_instance_--
