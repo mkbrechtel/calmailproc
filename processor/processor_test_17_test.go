@@ -297,7 +297,6 @@ func TestRecurringInstancesWithParent(t *testing.T) {
 		masterCount := 0
 		instanceCount := 0
 		var masterSeq, masterSummary string
-		var instanceDetails []string
 		
 		for _, component := range cal.Children {
 			if component.Name != "VEVENT" {
@@ -346,7 +345,6 @@ func TestRecurringInstancesWithParent(t *testing.T) {
 				
 				details := fmt.Sprintf("Instance #%d: RECURRENCE-ID=%s, SEQUENCE=%s, SUMMARY=%s", 
 					instanceCount, recurrenceID, seq, summary)
-				instanceDetails = append(instanceDetails, details)
 				t.Log(details)
 			}
 		}
