@@ -4,3 +4,5 @@
 @main.go
 @cli/cli.go
 @processor/processor.go
+@test.sh
+@test/README.md
