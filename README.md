@@ -134,14 +134,6 @@ This project uses GitHub Actions for continuous integration:
 - **Test and Build**: Ensures code quality by running tests and verifying that the code builds successfully across different Go versions
 - **Release**: Automatically creates binaries for multiple platforms when a new tag is pushed
 
-## Future Improvements
-
-- Enhanced timezone handling for better cross-timezone event management
-- Better support for complex recurring event patterns
-- MIME format improvements for better compatibility with various email clients
-- Calendar event filtering options
-- Notifications and reminders integration
-
 ## License
 
 Apache License 2.0
