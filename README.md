@@ -13,9 +13,8 @@ STATUS: WIP with major issues still.
   - Process email files from maildir folders (with recursive subfolder support)
   
 - **Storage Options**:
-  - Store calendar events in vdir format (compatible with vdirsyncer)
-  - Store calendar events in a single iCalendar file
-  - Default storage uses ~/.calendar directory
+  - Store calendar events via CalDAV server
+  - Support for XDG-based YAML configuration
 
 - **Processing Features**:
   - Parse iCalendar invitation data from email attachments
@@ -54,8 +53,8 @@ go install github.com/mkbrechtel/calmailproc@latest
 # Process an email file and display information in plain text
 cat email.eml | calmailproc
 
-# Specify storage location (vdir format)
-cat email.eml | calmailproc -vdir ~/.calendar/events
+# Specify CalDAV server URL
+cat email.eml | calmailproc -caldav https://caldav.example.com/user/calendar/
 ```
 
 ### Process a maildir
@@ -67,22 +66,20 @@ calmailproc -maildir ~/Mail/MyFolder
 # With verbose output
 calmailproc -maildir ~/Mail/MyFolder -verbose
 
-# Using a specific storage location
-calmailproc -maildir ~/Mail/MyFolder -vdir ~/.calendar/invitations
+# Using a specific CalDAV server
+calmailproc -maildir ~/Mail/MyFolder -caldav https://caldav.example.com/user/calendar/
 ```
 
 ### Command Line Options
 
 ```
 Usage of calmailproc:
-  -icalfile string
-        Path to single iCalendar file storage
+  -caldav string
+        CalDAV server URL for calendar storage
   -maildir string
         Path to maildir to process (will process all emails recursively)
   -process-replies
         Process attendance replies to update events (default true)
-  -vdir string
-        Path to vdir storage directory
   -verbose
         Enable verbose logging output
 ```
@@ -95,18 +92,25 @@ The tool is designed to be used in standard Unix mail pipelines. For example:
 # Process incoming mail with procmail
 :0c
 * ^Content-Type:.*text/calendar
-| calmailproc -vdir ~/.calendar/invitations > /path/to/logs/calendar.log
+| calmailproc -caldav https://caldav.example.com/user/calendar/ > /path/to/logs/calendar.log
 ```
 
-## Storage Formats
+## Configuration
 
-### vdir
+calmailproc supports XDG-based configuration via YAML file at `~/.config/calmailproc/config.yaml`:
 
-The vdir format stores each calendar event as a separate file in a directory structure, making it compatible with vdirsyncer and other calendar tools. Each event is stored in a file named with the event's UID and a .ics extension.
+```yaml
+caldav:
+  url: https://caldav.example.com/user/calendar/
+  username: your-username
+  # Password can be provided via environment variable CALDAV_PASSWORD
+```
 
-### iCalendar File
+## Storage Format
 
-A single iCalendar file can contain multiple events and is compatible with most calendar applications. This format is useful for simple import/export scenarios.
+### CalDAV
+
+Calendar events are stored on a CalDAV server, allowing synchronization across multiple devices and integration with standard calendar applications.
 
 ## Development
 
