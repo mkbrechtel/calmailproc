@@ -1,0 +1,6 @@
+@README.md
+@DEVELOPMENT.md
+@go.mod
+@main.go
+@cli/cli.go
+@processor/processor.go
