@@ -68,7 +68,9 @@ END:VCALENDAR
 	if err != nil {
 		t.Fatalf("Failed to create MIME part: %v", err)
 	}
-	part.Write(icsData)
+	if _, err := part.Write(icsData); err != nil {
+		t.Fatalf("Failed to write ICS data: %v", err)
+	}
 	writer.Close()
 
 	// Parse the MIME message

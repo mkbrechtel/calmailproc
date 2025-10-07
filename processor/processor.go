@@ -520,9 +520,7 @@ func (p *Processor) handleParentEventUpdate(existingEvent, newEvent *ical.Event)
 	updatedCal.Children = append(updatedCal.Children, newParentComponent)
 
 	// Add all preserved instance exceptions
-	for _, instance := range existingInstanceComponents {
-		updatedCal.Children = append(updatedCal.Children, instance)
-	}
+	updatedCal.Children = append(updatedCal.Children, existingInstanceComponents...)
 
 	// Encode the updated calendar back to bytes
 	calBytes, err := ical.EncodeCalendar(updatedCal)
@@ -562,15 +560,6 @@ func matchesRecurrenceID(event1, event2 *goical.Component) bool {
 	return false
 }
 
-// existingEventSequence gets the sequence number of an existing event
-// Returns -1 if the event doesn't exist or there's an error
-func existingEventSequence(store storage.Storage, uid string) int {
-	existingEvent, err := store.GetEvent(uid)
-	if err == nil && existingEvent != nil {
-		return existingEvent.Sequence
-	}
-	return -1 // Return -1 if event doesn't exist or there's an error
-}
 
 // prepareEventForStorage removes the METHOD property from an event before storing
 // This ensures the stored calendar data doesn't contain METHOD which is only for transport
