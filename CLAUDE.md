@@ -6,3 +6,4 @@
 @processor/processor.go
 @test.sh
 @test/README.md
+@issues/README.md
