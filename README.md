@@ -127,6 +127,14 @@ go fmt ./...
 golangci-lint run
 ```
 
+## Contributing
+
+### Reporting Issues
+
+Issues should be submitted as markdown files in the `issues/` directory via pull requests to the `main` branch. This approach allows for better tracking and documentation of problems and feature requests.
+
+See [issues/README.md](issues/README.md) for detailed instructions on how to report and track issues.
+
 ## GitHub Workflows
 
 This project uses GitHub Actions for continuous integration:
