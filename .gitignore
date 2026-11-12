@@ -4,4 +4,4 @@ test/calmailproc
 !test/config
 invitations.ics
 utils/maildecoder/maildecoder
-utils/maildecoder/attachments/
+utils/maildecoder/attachments//target
