@@ -927,3 +927,16 @@ fn test_19_uid_with_space() {
     );
     assert_eq!(occurrences(&event).len(), 1);
 }
+
+#[test]
+fn test_20_calendar_params_on_multipart() {
+    let mut processor = processor(true);
+    process(&mut processor, "test-20.eml");
+    let event = only_event(&processor);
+    assert_eq!(
+        event.uid,
+        "QEdrhcdfk Egxdczey-xfvzncf.qedrhcdfk.ulq-rqadavl-haccih-7"
+    );
+    assert_eq!(parents(&event).len(), 1);
+    assert_eq!(occurrences(&event).len(), 2);
+}
