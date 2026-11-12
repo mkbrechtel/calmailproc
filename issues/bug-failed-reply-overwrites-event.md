@@ -2,7 +2,7 @@
 
 **Type:** Bug
 
-**Status:** Open
+**Status:** Resolved
 
 ## Description
 
@@ -65,3 +65,28 @@ Neither ever replaces the event with the reply.
 
 What happens to a reply when there is no stored event at all is covered in
 `feature-force-flag-for-reply-or-cancel-without-event.md`.
+
+## Resolution
+
+**Resolved in:** version 0.2.0 (branch `rewrite-in-rust`)
+**Resolved by:** mkbrechtel, with Claude
+
+`apply_reply()` in `src/processor/mod.rs` replaces `update_attendee_status()`
+and the fallback. A reply now only ever changes its own attendee:
+
+- A stored attendee with the same address (compared without case) gets the
+  `PARTSTAT` of the reply.
+- An address that is not among the stored attendees is added as an attendee,
+  with the reply's parameters, after the existing attendees. The status
+  message is `Added attendee ... to event with UID ...`.
+- A reply for an occurrence that is not stored as its own component changes
+  nothing: `Ignoring reply for an occurrence that is not stored, ...`.
+- A reply without `ATTENDEE` or `PARTSTAT` is an error and changes nothing.
+
+Delegation (`DELEGATED-FROM` / `DELEGATED-TO`) is not treated specially: the
+delegate is added like any other unknown attendee.
+
+Tests in `tests/processor.rs`:
+`reply_from_unknown_attendee_adds_only_that_attendee`,
+`reply_for_an_occurrence_that_is_not_stored_changes_nothing`,
+`invalid_reply_is_an_error_and_changes_nothing`.

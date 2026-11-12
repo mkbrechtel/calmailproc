@@ -7,7 +7,7 @@ Test 12 tests handling of invalid calendar data that should cause an error.
 This test email should be rejected with an error message. We expect an error message like this:
 
 ```
-Error: error processing stdin: processing stdin: parsing email: extracting calendar data: extracting calendar info: parsing iCal data: decoding iCal data: malformed content line without ':': ORGANIZER;CN=Sixt SE
+Error: error processing stdin: processing stdin: parsing email: extracting calendar data: in text/calendar part: parsing iCal data: decoding iCal data: malformed content line 8 without ':': ORGANIZER;CN=Sixt SE
 ```
 
 The calendar attachment contains the content line `ORGANIZER;CN=Sixt SE`, which has no `:` and no value. The calendar is rejected before it is parsed. This tests the processor's ability to handle malformed iCalendar data gracefully.

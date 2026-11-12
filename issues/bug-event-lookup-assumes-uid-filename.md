@@ -2,7 +2,7 @@
 
 **Type:** Bug
 
-**Status:** Open
+**Status:** Resolved
 
 ## Description
 
@@ -75,3 +75,30 @@ cover this against Xandikos.
 - This matters most on a groupware server that the user also uses with a
   calendar client. On a calendar that only calmailproc writes to, it does
   not occur.
+
+## Resolution
+
+**Resolved in:** version 0.2.0 (branch `rewrite-in-rust`)
+**Resolved by:** mkbrechtel, with Claude
+
+`CalDavStorage::get_event()` in `src/storage/caldav.rs` tries `GET {UID}.ics`
+first. On 404 it sends a `REPORT` with a `calendar-query` for the UID
+(`find_by_uid()`), checks the UID of each result (the query matches
+substrings) and returns the event with the path it was found at.
+
+`Storage::get_event()` now returns a `Stored` value: the event plus a
+`Version` holding its location and ETag. `store_event()` and `delete_event()`
+take that `Version` and write to the location in it. The multistatus response
+is parsed with `roxmltree`.
+
+Resource names for new events are the percent-encoded UID, since UIDs may now
+contain any text (test 19).
+
+Tests: `event_stored_under_another_name_is_updated_in_place` in
+`tests/end_to_end.rs` (the fake server answers `REPORT`), unit tests in
+`src/storage/caldav.rs`, and a fourth scenario in `test.sh` that stores an
+event under another name in Xandikos and checks that it is updated in place.
+
+Not verified against Open-Xchange. The import report says it shows only a
+time window over CalDAV; whether its `calendar-query` finds events outside
+that window is unknown.

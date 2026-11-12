@@ -2,7 +2,7 @@
 
 **Type:** Feature Request
 
-**Status:** Open
+**Status:** Resolved
 
 ## Description
 
@@ -42,3 +42,19 @@ standard per-attendee comment. Options:
 
 Implement it in `update_attendee_status()` in `src/processor/mod.rs` and
 assert it in `invitation_and_reply()` in `tests/processor.rs`.
+
+## Resolution
+
+**Resolved in:** version 0.2.0 (branch `rewrite-in-rust`)
+**Resolved by:** mkbrechtel, with Claude
+
+`apply_reply()` in `src/processor/mod.rs` stores the reply's `COMMENT` as the
+parameter `X-RESPONSE-COMMENT` on the replying attendee, which is where
+Evolution reads it (`itip-view.c`) and Google Calendar writes it. The comment
+is reduced to one line and double quotes become single quotes, since it is a
+parameter value. A reply without comment removes an older comment of that
+attendee.
+
+Tests in `tests/processor.rs`: `test_06_stores_the_comment_of_the_reply`
+("no, sorry" from test-06-2) and
+`reply_from_unknown_attendee_adds_only_that_attendee`.

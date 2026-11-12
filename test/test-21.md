@@ -39,6 +39,9 @@ The system should:
      the line before it)
 2. Store one event: one parent and 226 occurrences
 
+## Status
+Both ways are implemented: empty lines in calendar data are ignored, and a calendar part that cannot be parsed is skipped if another one can.
+
 ## Origin
 A real invitation from the archive, anonymized for the test suite: addresses,
 names, UIDs and Message-IDs are replaced consistently (the same person or UID

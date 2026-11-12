@@ -39,6 +39,9 @@ The system should:
   fix for test 19. With the Content-Type parameters removed, the mail fails
   with the UID error of test 19.
 
+## Status
+A multipart part is never taken as calendar data.
+
 ## Origin
 A real invitation from the archive, anonymized for the test suite: addresses,
 names, UIDs and Message-IDs are replaced consistently (the same person or UID

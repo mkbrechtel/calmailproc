@@ -28,6 +28,9 @@ The system should:
   be percent-encoded there (`%20`), or mapped to a safe resource name.
 - Test 20 has the same UID form and needs this fix as well.
 
+## Status
+The UID is accepted; the CalDAV resource name is the percent-encoded UID.
+
 ## Origin
 A real invitation from the archive, anonymized for the test suite: addresses,
 names, UIDs and Message-IDs are replaced consistently (the same person or UID
@@ -37,3 +40,8 @@ length, and headers are reduced to those needed for parsing. The MIME
 structure, the line folding, dates, recurrence rules and time zones are kept
 byte for byte, and the anonymized mail fails in calmailproc 0.2.0 exactly like
 the original.
+
+One value was corrected after anonymization: the duration of
+`REFRESH-INTERVAL` had been replaced by random letters, which made the
+calendar invalid for a validating server (Xandikos rejected it). It is now
+`PT4H`.

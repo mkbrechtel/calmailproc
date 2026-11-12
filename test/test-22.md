@@ -43,6 +43,9 @@ The system should:
 - The error message names neither the empty line nor the part; a message that
   does would have made this much quicker to find.
 
+## Status
+Both ways are implemented, see test 21. Parse errors now name the part and show the offending line.
+
 ## Origin
 A real invitation from the archive, anonymized for the test suite: addresses,
 names, UIDs and Message-IDs are replaced consistently (the same person or UID

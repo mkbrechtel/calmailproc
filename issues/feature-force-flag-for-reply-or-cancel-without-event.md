@@ -2,7 +2,7 @@
 
 **Type:** Feature Request
 
-**Status:** Open
+**Status:** Resolved
 
 ## Description
 
@@ -58,3 +58,33 @@ Thunderbird and Evolution both ignore a reply or cancellation when the event
 is not in the calendar (`calItipUtils.sys.mjs`: "has already been processed",
 "item has been previously removed from the calendar"; `e-cal-meta-backend.c`:
 `OBJECT_NOT_FOUND` for a cancel).
+
+## Resolution
+
+**Resolved in:** version 0.2.0 (branch `rewrite-in-rust`)
+**Resolved by:** mkbrechtel, with Claude
+
+Implemented differently for the two cases, because of test 11.
+
+**Replies:** a reply for an event that is not stored is ignored
+(`Ignoring reply for unknown event with UID ...`). The flag `-force`
+(`processor.force` in the config file) stores it as an event, as before.
+
+**Cancellations:** a cancellation for an event that is not stored is still
+stored by default, as a cancelled event. `test/test-11.md` describes exactly
+this case ("appears mostly in maildir mode, when the cancelation is parsed
+before the request") and requires that the event stays cancelled whatever
+the processing order. Ignoring such cancellations by default would break that
+in every maildir run.
+
+Ignoring them is available as an option: `-ignore-unknown-cancellations`
+(`processor.ignore_unknown_cancellations`). With it, a request that is
+processed after its cancellation creates the event uncancelled.
+
+Tests in `tests/processor.rs`:
+`reply_for_unknown_event_is_ignored_unless_forced` and
+`test_11_out_of_sequence_mail` (default and with the option).
+
+Still order-dependent: a reply that is processed before its invitation is
+lost, since nothing is stored to remember it by. Thunderbird and Evolution
+behave the same.

@@ -2,7 +2,7 @@
 
 **Type:** Bug
 
-**Status:** Open
+**Status:** Resolved
 
 ## Description
 
@@ -71,3 +71,30 @@ result for all scenarios, including test 17
 
 Related: `bug-only-first-event-of-mail-processed.md` needs the same
 per-component restructuring of the processor.
+
+## Resolution
+
+**Resolved in:** version 0.2.0 (branch `rewrite-in-rust`)
+**Resolved by:** mkbrechtel, with Claude
+
+`apply_update()` in `src/processor/mod.rs` compares every component of a mail
+with the stored component it would replace (`ical::compare_components()`:
+SEQUENCE, then DTSTAMP): the parent with the stored parent, an occurrence
+with the stored occurrence of the same `RECURRENCE-ID`. The stored one stays
+if it is newer. A parent update is compared also when occurrences are stored,
+and a cancellation is subject to the same check. A cancelled occurrence keeps
+the sequence and DTSTAMP of its cancellation, so later mails are compared
+against that.
+
+Test 17 now ends in one state for every processing order: parent at
+sequence 5, 9 May at 6, 16 May at 7, and the two cancelled occurrences
+cancelled. `recurring_series_does_not_depend_on_processing_order` in
+`tests/order.rs` checks 416 of the 40320 orders in the normal test run, and
+all 40320 with `CALMAILPROC_ALL_ORDERS=1 cargo test --release --test order`.
+
+In the plain file order, test-17-2 is now reported as
+`Not processing older event (sequence: 2 vs 7, ...)`, because the 16 May
+occurrence is already stored from test-17-0 with sequence 7.
+
+Also tested: `each_component_is_checked_against_its_own_stored_version` in
+`tests/processor.rs`.

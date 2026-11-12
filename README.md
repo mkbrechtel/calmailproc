@@ -14,12 +14,15 @@ STATUS: WIP. Version 0.2 is a rewrite in Rust of the Go version 0.1.
 
 - **Storage**
   - Events are stored on a CalDAV server, one resource per event UID
+  - An event that is already in the calendar is found by its UID, whatever its resource is called, and updated in place
+  - A change made by someone else between reading and writing is not overwritten
 
 - **Processing**
   - Invitations and updates (`METHOD:REQUEST`): a newer version replaces the stored one, an older one is ignored
-  - Cancellations (`METHOD:CANCEL`)
-  - Attendance replies (`METHOD:REPLY`) update the attendee's status in the stored event (optional)
+  - Cancellations (`METHOD:CANCEL`): the event is kept and marked as cancelled, or deleted if configured
+  - Attendance replies (`METHOD:REPLY`) update the status of the replying attendee in the stored event (optional)
   - Recurring events: updates and cancellations of single occurrences are merged into the stored event
+  - The result does not depend on the order in which the mails for an event are processed
   - Invalid calendar data is rejected with an error
 
 - **Output**
@@ -70,6 +73,14 @@ The `new` and `cur` folders of the maildir and of all its subfolders are process
 Usage of calmailproc:
   -calendar string
         CalDAV calendar path (e.g., /calendar/)
+  -delete-cancelled
+        Delete cancelled events and occurrences instead of marking them
+  -drop-alarms
+        Remove alarms from events before storing them
+  -force
+        Store a reply even if its event is not stored
+  -ignore-unknown-cancellations
+        Ignore a cancellation if its event is not stored
   -maildir string
         Path to maildir to process (will process all emails recursively)
   -pass string
@@ -113,6 +124,10 @@ webdav:
 
 processor:
   process_replies: true
+  force: false
+  ignore_unknown_cancellations: false
+  delete_cancelled: false
+  drop_alarms: false
 
 maildir:
   path: /home/alice/Mail/Invitations
@@ -121,11 +136,27 @@ maildir:
 
 All sections and keys are optional. If `maildir.path` is set (or `-maildir` is given), the maildir is processed; otherwise an email is read from stdin. The file contains the password, so make it readable only by you (`chmod 600`).
 
+## How mails are processed
+
+Each event in a mail is handled by its UID. If the calendar has no event with that UID, the event is stored. Otherwise the mail is merged into the stored event:
+
+- The event itself and each changed occurrence of a recurring event are compared with their stored version by `SEQUENCE` and then `DTSTAMP`. The stored version stays if it is newer, so an old mail never undoes a newer one, whatever the order of processing.
+- A cancellation marks the event or the occurrence with `STATUS:CANCELLED`. The calendar then shows what was cancelled. With `delete_cancelled`, the event is deleted, or the occurrence removed from the series, instead.
+- A cancellation for an event that is not in the calendar is stored as a cancelled event, so that the event stays cancelled if its invitation is processed later. `ignore_unknown_cancellations` turns that off.
+- A reply sets the status of the replying attendee and nothing else. Someone who was not invited is added as an attendee. The comment of a reply is stored with the attendee (`X-RESPONSE-COMMENT`).
+- A reply for an event that is not in the calendar is ignored. `force` stores it anyway; use that only for a single mail you want in the calendar.
+
+What cannot be made independent of the order: a reply that is processed before its invitation is lost.
+
 ## Storage
 
-Each event is stored as `{calendar}/{UID}.ics` on the CalDAV server, so calendar clients that use the same calendar see the events. The `METHOD` property, which only belongs to the mail transport, is removed before storing.
+A new event is stored as `{calendar}/{UID}.ics`, with the UID percent-encoded. An event that something else put into the calendar under another name is found with a query for its UID and updated where it is.
 
-Organizers and attendees of a new event are stored with `SCHEDULE-AGENT=CLIENT`. This tells a CalDAV server with scheduling support that the invitations have already been exchanged by mail, so it does not send its own. An event that is already on the server keeps the setting it has.
+Before an event is stored:
+
+- The `METHOD` property, which only belongs to the mail transport, is removed.
+- Organizers and attendees that are new on the server get `SCHEDULE-AGENT=CLIENT`. This tells a CalDAV server with scheduling support that the invitations have already been exchanged by mail, so it does not send its own. Participants of an event that is already on the server keep the setting they have.
+- Attachments that refer to local files (`ATTACH:file:...`) are made unusable, and with `drop_alarms` the alarms of the sender are removed.
 
 ## Development
 

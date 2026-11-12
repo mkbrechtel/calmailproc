@@ -2,7 +2,7 @@
 
 **Type:** Bug
 
-**Status:** Open
+**Status:** Resolved
 
 ## Description
 
@@ -71,3 +71,32 @@ a `PUBLISH` with two UIDs.
   UID.
 - evolution-data-server loops over all components of the calendar and
   processes each on its own (`ecmb_receive_objects_sync()`).
+
+## Resolution
+
+**Resolved in:** version 0.2.0 (branch `rewrite-in-rust`)
+**Resolved by:** mkbrechtel, with Claude
+
+The processor now works per component (`src/processor/mod.rs`):
+
+1. `split_by_uid()` splits the mail's calendar into one calendar per UID.
+   Each is processed as its own event; the status messages are joined with
+   `; `. All are processed even if one fails, and the first failure is
+   reported.
+2. `apply_update()` goes through every `VEVENT` of that UID: the parent
+   replaces the stored parent, each `VEVENT` with `RECURRENCE-ID` replaces
+   or adds that occurrence. The order of the components in the mail does not
+   matter, and a mail with a parent and exceptions is no longer mistaken for
+   an update to one occurrence.
+3. Time zones (`VTIMEZONE`) that the merged event does not have yet are
+   added from the mail.
+
+The event is read, validated and stored once per UID.
+
+Tests in `tests/processor.rs`:
+`all_events_of_a_mail_are_processed_for_a_new_event`,
+`all_events_of_a_mail_are_merged_into_a_stored_event`,
+`several_occurrences_in_one_mail_are_all_merged`,
+`events_with_different_uids_in_one_mail_are_stored_separately`, and tests
+20, 21 and 22 from the archive import (a series with 2, 226 and 1 changed
+occurrences in one mail).

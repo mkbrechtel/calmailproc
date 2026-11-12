@@ -122,7 +122,13 @@ fn recurring_series_does_not_depend_on_processing_order() {
     assert_eq!(expected.len(), 5);
 
     // All 40320 orders take a while; every 97th is a spread of 416 of them.
-    for order in permutations(&TEST_17).into_iter().step_by(97) {
+    // `CALMAILPROC_ALL_ORDERS=1 cargo test --release --test order` checks all.
+    let step = if std::env::var_os("CALMAILPROC_ALL_ORDERS").is_some() {
+        1
+    } else {
+        97
+    };
+    for order in permutations(&TEST_17).into_iter().step_by(step) {
         assert_eq!(stored_after(&order), expected, "order {order:?}");
     }
 }

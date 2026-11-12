@@ -27,3 +27,12 @@ Organizer: sender@example.org
 Attendee: markus.brechtel@uk-koeln.de
 
 Since both messages have the same sequence number (0), we need to check the DTSTAMP values to determine which change is more recent. The cancellation message has DTSTAMP 20250417T112140Z (11:21:40 UTC) while the request message has DTSTAMP 20250417T110049Z (11:00:49 UTC). The cancellation was sent after the request, making it the most recent action. Therefore, the event should remain in a cancelled state, despite the processing order in the maildir.
+
+## Options
+
+A cancellation for an event that is not stored is kept as a cancelled event,
+which is what makes the above work when the cancellation is processed first.
+With `-ignore-unknown-cancellations` it is ignored instead; the request that
+follows then creates the event as confirmed. With `-delete-cancelled` a
+processed cancellation deletes the event, and a request processed afterwards
+creates it again.

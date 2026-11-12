@@ -2,7 +2,7 @@
 
 **Type:** Improvement
 
-**Status:** Open
+**Status:** Resolved
 
 ## Description
 
@@ -42,3 +42,31 @@ This shares the "location and version of the stored event" value with
 `bug-event-lookup-assumes-uid-filename.md` and is best done together with it.
 
 The fake server in `tests/end_to_end.rs` needs ETags and the two conditions.
+
+## Resolution
+
+**Resolved in:** version 0.2.0 (branch `rewrite-in-rust`)
+**Resolved by:** mkbrechtel, with Claude
+
+`CalDavStorage::store_event()` sends `If-Match` with the ETag that was read
+when it replaces an event and `If-None-Match: *` when it creates one;
+`delete_event()` sends `If-Match` too. If the server gave no ETag, the write
+is unconditional as before.
+
+A failed condition (HTTP 412) becomes `StoreError::Conflict`. The processor
+(`process_calendar()` in `src/processor/mod.rs`) then reads the event again,
+merges again and writes again, up to three times, and fails with "the stored
+event was changed by someone else 3 times in a row" after that.
+
+Xandikos also answers 412 when it rejects calendar data, with a WebDAV error
+body naming a CalDAV precondition such as `valid-calendar-data`. That is
+reported as an error with the server's explanation, not retried
+(`Reply::is_caldav_error()`).
+
+`MemoryStorage` checks versions the same way, and can inject conflicts for
+tests.
+
+Tests: `a_concurrent_change_is_read_again_and_merged` in
+`tests/processor.rs`, `writes_against_an_outdated_version_conflict` in
+`src/storage/memory.rs`, and the conditions in the fake server of
+`tests/end_to_end.rs`.

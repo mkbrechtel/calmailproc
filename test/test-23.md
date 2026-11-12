@@ -27,6 +27,9 @@ The system should:
 2. Store one event: one parent and one occurrence, every VEVENT with exactly
    one DTSTAMP
 
+## Status
+A missing DTSTAMP is taken from another event in the mail, else from the date of the mail.
+
 ## Origin
 A real invitation from the archive, anonymized for the test suite: addresses,
 names, UIDs and Message-IDs are replaced consistently (the same person or UID

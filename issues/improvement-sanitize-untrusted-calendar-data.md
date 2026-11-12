@@ -2,7 +2,7 @@
 
 **Type:** Improvement
 
-**Status:** Open
+**Status:** Resolved
 
 ## Description
 
@@ -84,3 +84,24 @@ Worth adopting from that:
 Whether a given client inlines `file://` attachments is that client's
 concern, and current clients may refuse. Sanitizing in calmailproc protects
 the calendar regardless of which client reads it.
+
+## Resolution
+
+**Resolved in:** version 0.2.0 (branch `rewrite-in-rust`)
+**Resolved by:** mkbrechtel, with Claude
+
+`normalize()` and `sanitize()` in `src/processor/mod.rs` run on the calendar
+of every mail before it is validated, merged or stored:
+
+- An `ATTACH` whose value starts with `file:` (any case) gets the scheme
+  `xfile:`, as in Evolution. This covers every component, including alarms.
+- `SCHEDULE-FORCE-SEND` and `SCHEDULE-STATUS` are removed from `ORGANIZER`
+  and `ATTENDEE`. `SCHEDULE-AGENT` is handled by `set_schedule_agents()`.
+- Alarms are kept by default. `processor.drop_alarms` in the config file, or
+  `-drop-alarms`, removes all `VALARM` components from events.
+
+Not done: keeping only `ACTION:DISPLAY` alarms, and removing other senders'
+private `X-` properties as Thunderbird does for its own.
+
+Tests in `tests/processor.rs`: `untrusted_calendar_data_is_sanitized`,
+`alarms_are_kept_unless_configured_otherwise`.
