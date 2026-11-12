@@ -17,6 +17,23 @@ use calmailproc::ical;
 const AUTHORIZATION: &str = "Basic dGVzdDpwYXNz";
 const CALENDAR: &str = "/user/calendars/calendar1/";
 
+/// Mails the binary rejects with an error.
+const REJECTED: [&str; 9] = [
+    // Invalid calendar data that must be rejected.
+    "test-12.eml",
+    "test-13.eml",
+    "test-14.eml",
+    "test-15.eml",
+    // Known bugs: these should be accepted. Each has a failing test in
+    // tests/processor.rs (test_19 to test_23); remove the mail from this
+    // list when its bug is fixed.
+    "test-19.eml",
+    "test-20.eml",
+    "test-21.eml",
+    "test-22.eml",
+    "test-23.eml",
+];
+
 type Store = Arc<Mutex<BTreeMap<String, String>>>;
 
 struct FakeCalDav {
@@ -164,10 +181,7 @@ fn run_stdin_mode(server: &FakeCalDav, config_home: &PathBuf) {
             Some(&std::fs::read(&mail).unwrap()),
             config_home,
         );
-        // Tests 12-15 contain invalid calendar data and must be rejected.
-        let expected = if ["test-12.eml", "test-13.eml", "test-14.eml", "test-15.eml"]
-            .contains(&name.as_str())
-        {
+        let expected = if REJECTED.contains(&name.as_str()) {
             1
         } else {
             0
@@ -207,7 +221,7 @@ fn stdin_maildir_and_config_file_modes_store_the_same_events() {
     let stderr = text(&output.stderr);
     assert_eq!(
         stderr.matches("Warning: failed to process").count(),
-        4,
+        REJECTED.len(),
         "{stderr}"
     );
     assert_eq!(maildir_server.events(), stdin_events);

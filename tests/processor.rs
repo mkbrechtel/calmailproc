@@ -979,6 +979,10 @@ fn test_23_instance_without_dtstamp() {
     assert_eq!(parents(&event).len(), 1);
     assert_eq!(occurrences(&event).len(), 1);
     for vevent in calendar(&event).events() {
-        assert_eq!(vevent.props("DTSTAMP").count(), 1, "every VEVENT needs one DTSTAMP");
+        assert_eq!(
+            vevent.props("DTSTAMP").count(),
+            1,
+            "every VEVENT needs one DTSTAMP"
+        );
     }
 }
