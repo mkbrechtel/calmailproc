@@ -348,11 +348,26 @@ fn matches_recurrence_id(a: &Component, b: &Component) -> bool {
     a.value("RECURRENCE-ID") == b.value("RECURRENCE-ID")
 }
 
-/// Removes the METHOD property, which belongs to the mail transport and must
-/// not be stored.
+/// Prepares an event for the CalDAV server. Every stored event passes through
+/// here.
+///
+/// - Removes the METHOD property, which belongs to the mail transport.
+/// - Sets `SCHEDULE-AGENT=CLIENT` on every ORGANIZER and ATTENDEE (RFC 6638,
+///   section 7.1). Without it a server with scheduling support treats the
+///   stored event as its own to schedule and mails the participants again,
+///   although the mail exchange has already happened.
 fn prepare_event_for_storage(event: &Event) -> Result<Event> {
     let mut calendar = ical::decode(&event.raw_data).context("decoding calendar")?;
     calendar.remove_props("METHOD");
+    for vevent in calendar.events_mut() {
+        for participant in vevent
+            .properties
+            .iter_mut()
+            .filter(|p| p.name == "ORGANIZER" || p.name == "ATTENDEE")
+        {
+            participant.set_param("SCHEDULE-AGENT", "CLIENT");
+        }
+    }
     Ok(Event {
         raw_data: ical::encode(&calendar).context("encoding calendar")?,
         ..event.clone()

@@ -28,7 +28,7 @@ STATUS: WIP. Version 0.2 is a rewrite in Rust of the Go version 0.1.
 
 ## Installation
 
-Requires Rust 1.88 or newer.
+Requires Rust 1.98 or newer (the `mail-parser` dependency sets this). Distribution packages are often older; install a current toolchain with [rustup](https://rustup.rs).
 
 ```bash
 git clone https://github.com/mkbrechtel/calmailproc.git
@@ -124,6 +124,8 @@ All sections and keys are optional. If `maildir.path` is set (or `-maildir` is g
 ## Storage
 
 Each event is stored as `{calendar}/{UID}.ics` on the CalDAV server, so calendar clients that use the same calendar see the events. The `METHOD` property, which only belongs to the mail transport, is removed before storing.
+
+Every organizer and attendee is stored with `SCHEDULE-AGENT=CLIENT`. This tells a CalDAV server with scheduling support that the invitations have already been exchanged by mail, so it does not send its own.
 
 ## Development
 

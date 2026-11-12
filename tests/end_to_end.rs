@@ -239,6 +239,20 @@ fn stdin_maildir_and_config_file_modes_store_the_same_events() {
             !calendar.has_prop("METHOD"),
             "{path}: METHOD must not be stored"
         );
+        // Otherwise a server with scheduling would mail the participants again.
+        for participant in calendar
+            .events()
+            .flat_map(|vevent| vevent.properties.iter())
+            .filter(|p| p.name == "ORGANIZER" || p.name == "ATTENDEE")
+        {
+            assert_eq!(
+                participant.param("SCHEDULE-AGENT"),
+                Some("CLIENT"),
+                "{path}: {} {}",
+                participant.name,
+                participant.value
+            );
+        }
     }
     let sequence_of = |uid_prefix: &str| {
         let (_, ics) = stdin_events

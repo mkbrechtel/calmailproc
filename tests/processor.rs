@@ -540,6 +540,120 @@ fn stored_events_have_no_method() {
     }
 }
 
+/// Every ORGANIZER and ATTENDEE of every VEVENT, with its SCHEDULE-AGENT.
+fn schedule_agents(event: &Event) -> Vec<(String, Option<String>)> {
+    calendar(event)
+        .events()
+        .flat_map(|vevent| vevent.properties.clone())
+        .filter(|p| p.name == "ORGANIZER" || p.name == "ATTENDEE")
+        .map(|p| {
+            (
+                format!("{} {}", p.name, p.value),
+                p.param("SCHEDULE-AGENT").map(str::to_string),
+            )
+        })
+        .collect()
+}
+
+fn assert_client_scheduling(event: &Event, expected_participants: usize, context: &str) {
+    let agents = schedule_agents(event);
+    assert_eq!(agents.len(), expected_participants, "{context}: {agents:?}");
+    for (participant, agent) in agents {
+        assert_eq!(
+            agent.as_deref(),
+            Some("CLIENT"),
+            "{context}: {participant} must have SCHEDULE-AGENT=CLIENT"
+        );
+    }
+}
+
+#[test]
+fn stored_events_tell_the_server_not_to_schedule() {
+    // issues/bug-missing-schedule-agent-client.md: without SCHEDULE-AGENT=CLIENT
+    // a CalDAV server with scheduling mails the participants again.
+
+    // New event: organizer and both attendees.
+    let mut processor = processor(true);
+    process(&mut processor, "test-05-1.eml");
+    let invited = only_event(&processor);
+    assert_client_scheduling(&invited, 3, "new event");
+
+    // The other parameters are untouched.
+    let attendee = first_vevent(&invited)
+        .props("ATTENDEE")
+        .find(|a| a.value == "mailto:markus.brechtel@uk-koeln.de")
+        .cloned()
+        .unwrap();
+    for (key, value) in [
+        ("RSVP", "TRUE"),
+        ("PARTSTAT", "NEEDS-ACTION"),
+        ("CUTYPE", "INDIVIDUAL"),
+        ("ROLE", "REQ-PARTICIPANT"),
+    ] {
+        assert_eq!(attendee.param(key), Some(value), "{key}");
+    }
+    assert_eq!(attendee.params.len(), 5, "only SCHEDULE-AGENT was added");
+
+    // After a reply updated the attendee status.
+    process(&mut processor, "test-05-2.eml");
+    let replied = only_event(&processor);
+    assert_client_scheduling(&replied, 3, "after reply");
+    assert_eq!(
+        partstat(&replied, "markus.brechtel@uk-koeln.de").as_deref(),
+        Some("ACCEPTED")
+    );
+
+    // After an update and after a cancellation.
+    let mut processor = self::processor(true);
+    process(&mut processor, "test-02-1.eml");
+    process(&mut processor, "test-02-2.eml");
+    assert_client_scheduling(&only_event(&processor), 2, "after update");
+    let mut processor = self::processor(true);
+    process(&mut processor, "test-01-1.eml");
+    process(&mut processor, "test-01-2.eml");
+    assert_client_scheduling(&only_event(&processor), 2, "after cancellation");
+
+    // Recurring event: the parent and every merged occurrence.
+    let mut processor = self::processor(true);
+    for name in [
+        "test-17-0.eml",
+        "test-17-1.eml",
+        "test-17-2.eml",
+        "test-17-7.eml",
+        "test-17-3.eml",
+        "test-17-4.eml",
+        "test-17-5.eml",
+        "test-17-6.eml",
+    ] {
+        process(&mut processor, name);
+    }
+    let recurring = only_event(&processor);
+    let vevents = parents(&recurring).len() + occurrences(&recurring).len();
+    assert!(vevents >= 4, "parent and occurrences: {vevents}");
+    assert_client_scheduling(&recurring, vevents * 2, "recurring event");
+}
+
+#[test]
+fn incoming_schedule_agent_server_is_overwritten() {
+    let mut processor = processor(true);
+    let mail = String::from_utf8(parent_mail("schedule-agent-server", 0))
+        .unwrap()
+        .replace(
+            "ORGANIZER:organizer@example.com",
+            "ORGANIZER;SCHEDULE-AGENT=SERVER:mailto:organizer@example.com\nATTENDEE;schedule-agent=NONE;CN=A:mailto:a@example.com",
+        );
+    process_raw(&mut processor, mail.as_bytes());
+    let event = only_event(&processor);
+    assert_client_scheduling(&event, 2, "overwritten");
+    let attendee = first_vevent(&event).prop("ATTENDEE").cloned().unwrap();
+    assert_eq!(
+        attendee.params.len(),
+        2,
+        "no duplicate parameter: {:?}",
+        attendee.params
+    );
+}
+
 // --- Synthetic recurring event mails -------------------------------------
 
 /// A multipart mail with one calendar part holding a single VEVENT.

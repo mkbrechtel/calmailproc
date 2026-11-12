@@ -2,7 +2,7 @@
 
 **Type:** Bug
 
-**Status:** Open
+**Status:** Resolved
 
 ## Description
 
@@ -81,3 +81,23 @@ Tests to add:
 - The end-to-end test in `test.sh` runs a local Xandikos with no mail
   delivery, so it cannot observe the duplicate mail itself. The check has to
   be made on the stored iCalendar data.
+
+## Resolution
+
+**Resolved in:** version 0.2.0 (branch `rewrite-in-rust`)
+**Resolved by:** mkbrechtel, with Claude
+
+`prepare_event_for_storage()` in `src/processor/mod.rs` now sets
+`SCHEDULE-AGENT=CLIENT` on the `ORGANIZER` and every `ATTENDEE` of every
+`VEVENT`, replacing any value the mail carried. Every stored event passes
+through that function, so this covers new events, updates, cancellations,
+occurrence merges, parent updates and replies.
+
+Tests: `stored_events_tell_the_server_not_to_schedule` and
+`incoming_schedule_agent_server_is_overwritten` in `tests/processor.rs`, and
+a check on every event stored by the binary in `tests/end_to_end.rs`.
+
+Not verified against a server that actually sends scheduling mails: Xandikos,
+used by `test.sh`, has no mail delivery. Whether a given server honours the
+parameter has to be checked on that server, with a test event whose
+participants are addresses you control.
