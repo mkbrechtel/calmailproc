@@ -53,7 +53,7 @@ fn maildir_processes_all_mails_and_survives_broken_ones() {
         let events = processor.storage.list_events();
         assert_eq!(
             events.len(),
-            14,
+            19,
             "one event per test with valid calendar data"
         );
         assert!(events.iter().all(|event| !event.uid.is_empty()));

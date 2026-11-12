@@ -3,7 +3,7 @@
 
 use calmailproc::ical::{self, Calendar, Component, Event};
 use calmailproc::processor::Processor;
-use calmailproc::storage::{MemoryStorage, Storage};
+use calmailproc::storage::MemoryStorage;
 
 type TestProcessor = Processor<MemoryStorage>;
 
@@ -233,14 +233,153 @@ fn test_06_invitation_and_decline() {
 }
 
 #[test]
-fn reply_without_stored_event_is_stored() {
+fn test_06_stores_the_comment_of_the_reply() {
+    let mut processor = processor(true);
+    process(&mut processor, "test-06-1.eml");
+    process(&mut processor, "test-06-2.eml");
+    let attendee = first_vevent(&only_event(&processor))
+        .props("ATTENDEE")
+        .find(|a| a.value == "mailto:markus.brechtel@uk-koeln.de")
+        .cloned()
+        .unwrap();
+    assert_eq!(attendee.param("X-RESPONSE-COMMENT"), Some("no, sorry"));
+
+    // A later reply without a comment clears the old one.
+    let uid = only_event(&processor).uid;
+    let reply = synthetic_reply(
+        &uid,
+        "ATTENDEE;PARTSTAT=ACCEPTED:MAILTO:markus.brechtel@uk-koeln.de",
+        None,
+        None,
+    );
+    process_raw(&mut processor, &reply);
+    let event = only_event(&processor);
+    assert_eq!(
+        partstat(&event, "markus.brechtel@uk-koeln.de").as_deref(),
+        Some("ACCEPTED")
+    );
+    let attendee = first_vevent(&event)
+        .props("ATTENDEE")
+        .find(|a| a.value == "mailto:markus.brechtel@uk-koeln.de")
+        .cloned()
+        .unwrap();
+    assert_eq!(attendee.param("X-RESPONSE-COMMENT"), None);
+}
+
+#[test]
+fn reply_for_unknown_event_is_ignored_unless_forced() {
+    // A reply is not an event. Stored as one it would also keep the real
+    // invitation out when that is processed later.
     let mut processor = processor(true);
     let status = process(&mut processor, "test-05-2.eml");
+    assert!(
+        status.starts_with("Ignoring reply for unknown event with UID "),
+        "{status}"
+    );
+    assert_eq!(processor.storage.event_count(), 0);
+    process(&mut processor, "test-05-1.eml");
+    assert_eq!(only_event(&processor).summary, "Test 5");
+
+    let mut forced = self::processor(true);
+    forced.config.force = true;
+    let status = process(&mut forced, "test-05-2.eml");
     assert!(
         status.starts_with("Stored new reply event with UID "),
         "{status}"
     );
-    assert_eq!(processor.storage.event_count(), 1);
+    assert_eq!(forced.storage.event_count(), 1);
+}
+
+#[test]
+fn reply_from_unknown_attendee_adds_only_that_attendee() {
+    let mut processor = processor(true);
+    process(&mut processor, "test-05-1.eml");
+    let invited = only_event(&processor);
+
+    // The same reply, but from an address that was not invited.
+    let reply = String::from_utf8(synthetic_reply(
+        &invited.uid,
+        "ATTENDEE;PARTSTAT=TENTATIVE;CN=Deputy:mailto:deputy@example.com",
+        Some("COMMENT:I come \"instead\"\\nof my boss"),
+        None,
+    ))
+    .unwrap();
+    let status = process_raw(&mut processor, reply.as_bytes());
+    assert_eq!(
+        status,
+        format!(
+            "Added attendee mailto:deputy@example.com to event with UID {}",
+            invited.uid
+        )
+    );
+
+    let updated = only_event(&processor);
+    // The invitation is intact: same summary, the two invited attendees
+    // unchanged, one attendee more.
+    assert_eq!(updated.summary, "Test 5");
+    for address in ["markus.brechtel@uk-koeln.de", "markus.brechtel@thengo.net"] {
+        assert_eq!(partstat(&updated, address).as_deref(), Some("NEEDS-ACTION"));
+    }
+    assert_eq!(
+        partstat(&updated, "deputy@example.com").as_deref(),
+        Some("TENTATIVE")
+    );
+    let vevent = first_vevent(&updated);
+    assert_eq!(vevent.props("ATTENDEE").count(), 3);
+    assert_eq!(
+        vevent.properties.len(),
+        first_vevent(&invited).properties.len() + 1
+    );
+    let deputy = vevent
+        .props("ATTENDEE")
+        .find(|a| a.value == "mailto:deputy@example.com")
+        .unwrap();
+    assert_eq!(deputy.param("CN"), Some("Deputy"));
+    assert_eq!(
+        deputy.param("X-RESPONSE-COMMENT"),
+        Some("I come 'instead' of my boss")
+    );
+    // New on the server, so the server must not schedule for them.
+    assert_eq!(deputy.param("SCHEDULE-AGENT"), Some("CLIENT"));
+}
+
+#[test]
+fn reply_for_an_occurrence_that_is_not_stored_changes_nothing() {
+    let mut processor = processor(true);
+    process(&mut processor, "test-05-1.eml");
+    let before = only_event(&processor);
+    let reply = synthetic_reply(
+        &before.uid,
+        "ATTENDEE;PARTSTAT=DECLINED:mailto:markus.brechtel@uk-koeln.de",
+        None,
+        Some("RECURRENCE-ID:20250326T100000"),
+    );
+    let status = process_raw(&mut processor, &reply);
+    assert!(
+        status.starts_with("Ignoring reply for an occurrence that is not stored"),
+        "{status}"
+    );
+    assert_eq!(only_event(&processor), before);
+}
+
+#[test]
+fn invalid_reply_is_an_error_and_changes_nothing() {
+    let mut processor = processor(true);
+    process(&mut processor, "test-05-1.eml");
+    let before = only_event(&processor);
+    let reply = synthetic_reply(
+        &before.uid,
+        "ATTENDEE:mailto:someone@example.com",
+        None,
+        None,
+    );
+    let failure = processor.process_email(&reply).unwrap_err();
+    assert!(
+        failure.error.to_string().contains("no PARTSTAT"),
+        "{}",
+        failure.error
+    );
+    assert_eq!(only_event(&processor), before);
 }
 
 #[test]
@@ -339,13 +478,9 @@ fn test_10_inline_calendar_content() {
 #[test]
 fn test_11_out_of_sequence_mail() {
     let uid = "040000008200E00074C5B7101A82E0080000000071F706FA87AFDB010000000000000000100000004BEAA256602AD04DB92DF1261AC49A16";
-    let is_cancelled = |processor: &mut TestProcessor| {
-        let event = processor
-            .storage
-            .get_event(uid)
-            .unwrap()
-            .expect("event stored");
-        value(&first_vevent(&event), "STATUS") == "CANCELLED"
+    let is_cancelled = |processor: &TestProcessor| {
+        let event = processor.storage.event(uid).expect("event stored");
+        value(&first_vevent(event), "STATUS") == "CANCELLED"
     };
 
     // In order: request, then cancellation.
@@ -353,10 +488,10 @@ fn test_11_out_of_sequence_mail() {
     process(&mut processor, "test-11-2.eml");
     let status = process(&mut processor, "test-11-1.eml");
     assert!(status.ends_with(", new sequence: 0"), "{status}");
-    assert!(is_cancelled(&mut processor));
+    assert!(is_cancelled(&processor));
 
-    // Out of order: the cancellation arrives first and must not be undone by
-    // the older request.
+    // Out of order: the cancellation is processed first. It is stored and
+    // must not be undone by the older request.
     let mut processor = self::processor(true);
     let status = process(&mut processor, "test-11-1.eml");
     assert!(status.starts_with("Stored new event with UID "), "{status}");
@@ -365,7 +500,20 @@ fn test_11_out_of_sequence_mail() {
         status.starts_with("Not processing older event (sequence: 0 vs 0, DTSTAMP comparison)"),
         "{status}"
     );
-    assert!(is_cancelled(&mut processor));
+    assert!(is_cancelled(&processor));
+
+    // Configured to ignore cancellations for unknown events: the request
+    // that follows creates the event, which then is not cancelled.
+    let mut processor = self::processor(true);
+    processor.config.ignore_unknown_cancellations = true;
+    let status = process(&mut processor, "test-11-1.eml");
+    assert!(
+        status.starts_with("Ignoring cancellation for unknown event with UID "),
+        "{status}"
+    );
+    assert_eq!(processor.storage.event_count(), 0);
+    process(&mut processor, "test-11-2.eml");
+    assert!(!is_cancelled(&processor));
 }
 
 /// A mail whose calendar must be rejected with an error mentioning `expected`.
@@ -381,7 +529,10 @@ fn rejected(name: &str, expected: &str) {
 
 #[test]
 fn test_12_invalid_calendar_data() {
-    rejected("test-12.eml", "malformed content line without ':'");
+    rejected(
+        "test-12.eml",
+        "malformed content line 8 without ':': ORGANIZER;CN=Sixt SE",
+    );
 }
 
 #[test]
@@ -416,7 +567,7 @@ fn test_16_invalid_dtstamp_format() {
 fn test_17_recurring_instances_with_parent() {
     let uid = "040000008200E00074C5B7101A82E0080000000060FA38123DBBDB010000000000000000100000009123BEADE9978A4AA0AC92EF2005A108";
     let mut processor = processor(false);
-    let stored = |processor: &mut TestProcessor| processor.storage.get_event(uid).unwrap().unwrap();
+    let stored = |processor: &mut TestProcessor| processor.storage.event(uid).unwrap().clone();
 
     // 17-0 is itself an occurrence update and arrives first.
     let status = process(&mut processor, "test-17-0.eml");
@@ -428,7 +579,12 @@ fn test_17_recurring_instances_with_parent() {
             "test-17-1.eml",
             "Updated parent event while preserving instances",
         ),
-        ("test-17-2.eml", "Updated recurring event instance"),
+        // The 16 May occurrence is already stored from 17-0 with sequence 7;
+        // 17-2 is an older version of it (sequence 2).
+        (
+            "test-17-2.eml",
+            "Not processing older event (sequence: 2 vs 7",
+        ),
         (
             "test-17-7.eml",
             "Updated parent event while preserving instances",
@@ -481,6 +637,11 @@ fn test_17_recurring_instances_with_parent() {
         .collect();
     assert_eq!(may_9.len(), 1, "an occurrence is replaced, not duplicated");
     assert_eq!(value(may_9[0], "SEQUENCE"), "6");
+    let may_16 = occurrences
+        .iter()
+        .find(|o| value(o, "RECURRENCE-ID") == "20250516T150000")
+        .unwrap();
+    assert_eq!(value(may_16, "SEQUENCE"), "7", "the newest version is kept");
     for cancelled in ["20250523T150000", "20250606T150000"] {
         let occurrence = occurrences
             .iter()
@@ -504,7 +665,7 @@ fn test_18_instance_before_parent() {
 
     let status = process(&mut processor, "test-18-0.eml");
     assert!(status.starts_with("Stored new event"), "{status}");
-    let event = processor.storage.get_event(uid).unwrap().unwrap();
+    let event = processor.storage.event(uid).unwrap().clone();
     assert_eq!(event.sequence, 2);
     assert_eq!(occurrences(&event).len(), 1);
 
@@ -513,7 +674,7 @@ fn test_18_instance_before_parent() {
         status.starts_with("Updated parent event while preserving instances"),
         "{status}"
     );
-    let event = processor.storage.get_event(uid).unwrap().unwrap();
+    let event = processor.storage.event(uid).unwrap().clone();
     let parents = parents(&event);
     assert_eq!(parents.len(), 1);
     assert!(parents[0].has_prop("RRULE"));
@@ -525,8 +686,8 @@ fn test_18_instance_before_parent() {
 fn stored_events_have_no_method() {
     for name in [
         "test-01-1.eml",
-        "test-03-2.eml",
-        "test-05-2.eml",
+        "test-03-3.eml",
+        "test-10.eml",
         "test-16-1.eml",
     ] {
         let mut processor = processor(true);
@@ -659,7 +820,7 @@ fn incoming_schedule_agent_server_is_overwritten() {
 fn store_as_is(processor: &mut TestProcessor, raw: &[u8]) {
     let event = calmailproc::email::parse(raw).unwrap().event.unwrap();
     assert!(!event.raw_data.contains("SCHEDULE-AGENT=CLIENT"));
-    processor.storage.store_event(&event).unwrap();
+    processor.storage.put(&event);
 }
 
 #[test]
@@ -754,6 +915,27 @@ fn synthetic_mail(vevent_lines: &[&str]) -> Vec<u8> {
     format!(
         "From: organizer@example.com\nTo: attendee@example.com\nSubject: Meeting\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=\"boundary\"\n\n--boundary\nContent-Type: text/plain\n\nHello.\n\n--boundary\nContent-Type: text/calendar; method=REQUEST; charset=UTF-8\nContent-Transfer-Encoding: 7bit\n\nBEGIN:VCALENDAR\nPRODID:-//Test//EN\nVERSION:2.0\nMETHOD:REQUEST\nBEGIN:VEVENT\n{}\nORGANIZER:organizer@example.com\nEND:VEVENT\nEND:VCALENDAR\n--boundary--\n",
         vevent_lines.join("\n")
+    )
+    .into_bytes()
+}
+
+/// A METHOD:REPLY mail for the event `uid` with this ATTENDEE line.
+fn synthetic_reply(
+    uid: &str,
+    attendee: &str,
+    comment: Option<&str>,
+    recurrence_id: Option<&str>,
+) -> Vec<u8> {
+    let mut lines = vec![
+        format!("UID:{uid}"),
+        "DTSTAMP:20250311T090000Z".to_string(),
+        attendee.to_string(),
+    ];
+    lines.extend(comment.map(str::to_string));
+    lines.extend(recurrence_id.map(str::to_string));
+    format!(
+        "From: someone@example.com\nTo: organizer@example.com\nSubject: Reply\nMIME-Version: 1.0\nContent-Type: text/calendar; method=REPLY; charset=UTF-8\n\nBEGIN:VCALENDAR\nPRODID:-//Test//EN\nVERSION:2.0\nMETHOD:REPLY\nBEGIN:VEVENT\n{}\nEND:VEVENT\nEND:VCALENDAR\n",
+        lines.join("\n")
     )
     .into_bytes()
 }
@@ -898,17 +1080,15 @@ fn stored_event_with_several_occurrences_round_trips() {
     ];
 
     let mut store = MemoryStorage::new();
-    store
-        .store_event(&Event {
-            uid: "multi-recurring-event".to_string(),
-            raw_data: ical::encode(&calendar).unwrap(),
-            summary: "Multi-Instance Meeting".to_string(),
-            method: "REQUEST".to_string(),
-            sequence: 1,
-        })
-        .unwrap();
+    store.put(&Event {
+        uid: "multi-recurring-event".to_string(),
+        raw_data: ical::encode(&calendar).unwrap(),
+        summary: "Multi-Instance Meeting".to_string(),
+        method: "REQUEST".to_string(),
+        sequence: 1,
+    });
 
-    let event = store.get_event("multi-recurring-event").unwrap().unwrap();
+    let event = store.event("multi-recurring-event").unwrap().clone();
     assert_eq!(parents(&event).len(), 1);
     let occurrences = occurrences(&event);
     assert_eq!(occurrences.len(), 2);
@@ -985,4 +1165,380 @@ fn test_23_instance_without_dtstamp() {
             "every VEVENT needs one DTSTAMP"
         );
     }
+}
+
+// --- Mails with several events, options, and repairs ----------------------
+
+/// A calendar mail with any number of VEVENTs, each given as its lines.
+fn calendar_mail(method: &str, vevents: &[Vec<String>]) -> Vec<u8> {
+    let events: String = vevents
+        .iter()
+        .map(|lines| format!("BEGIN:VEVENT\n{}\nEND:VEVENT\n", lines.join("\n")))
+        .collect();
+    format!(
+        "From: organizer@example.com\nTo: attendee@example.com\nSubject: Meeting\nDate: Mon, 05 May 2025 10:00:00 +0200\nMIME-Version: 1.0\nContent-Type: text/calendar; method={method}; charset=UTF-8\n\nBEGIN:VCALENDAR\nPRODID:-//Test//EN\nVERSION:2.0\nMETHOD:{method}\n{events}END:VCALENDAR\n"
+    )
+    .into_bytes()
+}
+
+fn parent_lines(uid: &str, sequence: u32) -> Vec<String> {
+    vec![
+        format!("UID:{uid}"),
+        format!("SEQUENCE:{sequence}"),
+        "SUMMARY:Series".to_string(),
+        "DTSTART:20250505T100000Z".to_string(),
+        "RRULE:FREQ=WEEKLY;COUNT=5".to_string(),
+        "DTSTAMP:20250501T120000Z".to_string(),
+    ]
+}
+
+fn occurrence_lines(uid: &str, day: &str, sequence: u32) -> Vec<String> {
+    vec![
+        format!("UID:{uid}"),
+        format!("SEQUENCE:{sequence}"),
+        format!("SUMMARY:Moved {day} v{sequence}"),
+        format!("DTSTART:{day}T140000Z"),
+        format!("RECURRENCE-ID:{day}T100000Z"),
+        "DTSTAMP:20250501T120000Z".to_string(),
+    ]
+}
+
+fn summaries(components: &[Component]) -> Vec<String> {
+    components.iter().map(|c| value(c, "SUMMARY")).collect()
+}
+
+#[test]
+fn all_events_of_a_mail_are_processed_for_a_new_event() {
+    let uid = "series-with-exceptions";
+    let mut processor = processor(true);
+    let mail = calendar_mail(
+        "REQUEST",
+        &[
+            parent_lines(uid, 0),
+            occurrence_lines(uid, "20250512", 0),
+            occurrence_lines(uid, "20250519", 0),
+        ],
+    );
+    assert_eq!(
+        process_raw(&mut processor, &mail),
+        format!("Stored new event with UID {uid}")
+    );
+    let event = only_event(&processor);
+    assert_eq!(parents(&event).len(), 1);
+    assert_eq!(occurrences(&event).len(), 2);
+}
+
+#[test]
+fn all_events_of_a_mail_are_merged_into_a_stored_event() {
+    let uid = "series-update";
+    let mut processor = processor(true);
+    process_raw(
+        &mut processor,
+        &calendar_mail("REQUEST", &[parent_lines(uid, 0)]),
+    );
+    process_raw(
+        &mut processor,
+        &calendar_mail("REQUEST", &[occurrence_lines(uid, "20250512", 1)]),
+    );
+
+    // One mail: a new parent, a newer version of the stored occurrence, an
+    // occurrence that is new, in an order that does not start with the parent.
+    let mail = calendar_mail(
+        "REQUEST",
+        &[
+            occurrence_lines(uid, "20250512", 2),
+            parent_lines(uid, 3),
+            occurrence_lines(uid, "20250526", 2),
+        ],
+    );
+    let status = process_raw(&mut processor, &mail);
+    assert_eq!(
+        status,
+        format!("Updated parent event while preserving instances with UID {uid}")
+    );
+    let event = only_event(&processor);
+    assert_eq!(value(&parents(&event)[0], "SEQUENCE"), "3");
+    assert_eq!(
+        summaries(&occurrences(&event)),
+        ["Moved 20250512 v2", "Moved 20250526 v2"]
+    );
+    assert_eq!(event.sequence, 3, "the parent is the first event");
+}
+
+#[test]
+fn several_occurrences_in_one_mail_are_all_merged() {
+    let uid = "two-occurrences";
+    let mut processor = processor(true);
+    process_raw(
+        &mut processor,
+        &calendar_mail("REQUEST", &[parent_lines(uid, 0)]),
+    );
+    let status = process_raw(
+        &mut processor,
+        &calendar_mail(
+            "REQUEST",
+            &[
+                occurrence_lines(uid, "20250512", 1),
+                occurrence_lines(uid, "20250519", 1),
+            ],
+        ),
+    );
+    assert_eq!(
+        status,
+        format!("Updated recurring event instance with UID {uid}")
+    );
+    assert_eq!(occurrences(&only_event(&processor)).len(), 2);
+}
+
+#[test]
+fn each_component_is_checked_against_its_own_stored_version() {
+    let uid = "per-component";
+    let mut processor = processor(true);
+    process_raw(
+        &mut processor,
+        &calendar_mail(
+            "REQUEST",
+            &[parent_lines(uid, 5), occurrence_lines(uid, "20250512", 5)],
+        ),
+    );
+
+    // An older parent with a newer occurrence: only the occurrence is applied.
+    let status = process_raw(
+        &mut processor,
+        &calendar_mail(
+            "REQUEST",
+            &[parent_lines(uid, 4), occurrence_lines(uid, "20250512", 6)],
+        ),
+    );
+    assert_eq!(
+        status,
+        format!("Updated recurring event instance with UID {uid}")
+    );
+    let event = only_event(&processor);
+    assert_eq!(value(&parents(&event)[0], "SEQUENCE"), "5");
+    assert_eq!(summaries(&occurrences(&event)), ["Moved 20250512 v6"]);
+
+    // Everything older: nothing changes.
+    let status = process_raw(
+        &mut processor,
+        &calendar_mail(
+            "REQUEST",
+            &[parent_lines(uid, 1), occurrence_lines(uid, "20250512", 2)],
+        ),
+    );
+    assert_eq!(
+        status,
+        format!("Not processing older event (sequence: 1 vs 5, DTSTAMP comparison) with UID {uid}")
+    );
+    assert_eq!(only_event(&processor), event);
+
+    // An older cancellation of the occurrence does not cancel it either.
+    process_raw(
+        &mut processor,
+        &calendar_mail("CANCEL", &[occurrence_lines(uid, "20250512", 3)]),
+    );
+    assert!(!occurrences(&only_event(&processor))[0].has_prop("STATUS"));
+}
+
+#[test]
+fn events_with_different_uids_in_one_mail_are_stored_separately() {
+    let mut processor = processor(true);
+    let mail = calendar_mail(
+        "PUBLISH",
+        &[
+            parent_lines("published-a", 0),
+            parent_lines("published-b", 0),
+        ],
+    );
+    assert_eq!(
+        process_raw(&mut processor, &mail),
+        "Stored new event with UID published-a; Stored new event with UID published-b"
+    );
+    assert_eq!(processor.storage.event_count(), 2);
+    for uid in ["published-a", "published-b"] {
+        let event = processor.storage.event(uid).unwrap();
+        assert_eq!(calendar(event).events().count(), 1);
+        assert_eq!(value(&first_vevent(event), "UID"), uid);
+    }
+}
+
+#[test]
+fn cancelled_event_is_deleted_if_configured() {
+    let mut processor = processor(true);
+    processor.config.delete_cancelled = true;
+    process(&mut processor, "test-01-1.eml");
+    assert_eq!(processor.storage.event_count(), 1);
+    let status = process(&mut processor, "test-01-2.eml");
+    assert!(
+        status.starts_with("Deleted cancelled event with UID "),
+        "{status}"
+    );
+    assert_eq!(processor.storage.event_count(), 0);
+
+    // Nothing to delete, and nothing is stored to remember it by.
+    let status = process(&mut processor, "test-01-2.eml");
+    assert!(
+        status.starts_with("Ignoring cancellation for unknown event"),
+        "{status}"
+    );
+    assert_eq!(processor.storage.event_count(), 0);
+}
+
+#[test]
+fn cancelled_occurrence_is_removed_from_the_series_if_configured() {
+    let mut processor = processor(true);
+    processor.config.delete_cancelled = true;
+    process(&mut processor, "test-03-1.eml");
+    process(&mut processor, "test-03-3.eml"); // changes the 20 March occurrence
+    let status = process(&mut processor, "test-03-2.eml"); // cancels 27 March
+    assert!(
+        status.starts_with("Removed cancelled occurrence from event with UID "),
+        "{status}"
+    );
+
+    let event = only_event(&processor);
+    let parent = &parents(&event)[0];
+    let exdate = parent.prop("EXDATE").expect("the occurrence is excluded");
+    assert_eq!(exdate.value, "20250327T150000");
+    assert!(
+        exdate.param("TZID").is_some(),
+        "same time zone as the series"
+    );
+    assert_eq!(occurrences(&event).len(), 1, "the changed occurrence stays");
+    assert_eq!(
+        value(&occurrences(&event)[0], "RECURRENCE-ID"),
+        "20250320T150000"
+    );
+
+    // Processing the cancellation again does not add a second EXDATE.
+    process(&mut processor, "test-03-2.eml");
+    assert_eq!(
+        parents(&only_event(&processor))[0].props("EXDATE").count(),
+        1
+    );
+}
+
+#[test]
+fn untrusted_calendar_data_is_sanitized() {
+    let uid = "sanitize";
+    let mut lines = parent_lines(uid, 0);
+    lines.extend(
+        [
+            "ATTACH:file:///home/user/.ssh/id_rsa",
+            "ATTACH;FMTTYPE=application/pdf:https://example.com/agenda.pdf",
+            "ORGANIZER;SCHEDULE-FORCE-SEND=REQUEST:mailto:organizer@example.com",
+            "ATTENDEE;SCHEDULE-STATUS=1.2;schedule-force-send=REPLY;CN=A:mailto:a@example.com",
+            "BEGIN:VALARM",
+            "ACTION:AUDIO",
+            "TRIGGER:-PT15M",
+            "ATTACH:FILE:///etc/passwd",
+            "END:VALARM",
+        ]
+        .map(String::from),
+    );
+    let mut processor = processor(true);
+    process_raw(&mut processor, &calendar_mail("REQUEST", &[lines]));
+
+    let vevent = first_vevent(&only_event(&processor));
+    let attachments: Vec<&str> = vevent.props("ATTACH").map(|a| a.value.as_str()).collect();
+    assert_eq!(
+        attachments,
+        [
+            "xfile:///home/user/.ssh/id_rsa",
+            "https://example.com/agenda.pdf"
+        ]
+    );
+    assert_eq!(
+        vevent.components[0].value("ATTACH"),
+        Some("xFILE:///etc/passwd")
+    );
+    for participant in vevent
+        .properties
+        .iter()
+        .filter(|p| p.name == "ORGANIZER" || p.name == "ATTENDEE")
+    {
+        let params: Vec<&str> = participant.params.iter().map(|(k, _)| k.as_str()).collect();
+        assert!(
+            !params
+                .iter()
+                .any(|k| k.to_uppercase().starts_with("SCHEDULE-")
+                    && !k.eq_ignore_ascii_case("SCHEDULE-AGENT")),
+            "{params:?}"
+        );
+        assert_eq!(participant.param("SCHEDULE-AGENT"), Some("CLIENT"));
+    }
+}
+
+#[test]
+fn alarms_are_kept_unless_configured_otherwise() {
+    let has_alarm = |processor: &TestProcessor| {
+        first_vevent(&only_event(processor))
+            .components
+            .iter()
+            .any(|c| c.name == "VALARM")
+    };
+    let mut keeping = processor(true);
+    process(&mut keeping, "test-10.eml");
+    assert!(has_alarm(&keeping));
+
+    let mut dropping = processor(true);
+    dropping.config.drop_alarms = true;
+    process(&mut dropping, "test-10.eml");
+    assert!(!has_alarm(&dropping));
+}
+
+#[test]
+fn missing_dtstamp_is_taken_from_the_mail_date() {
+    let uid = "no-dtstamp-anywhere";
+    let lines: Vec<String> = parent_lines(uid, 0)
+        .into_iter()
+        .filter(|line| !line.starts_with("DTSTAMP"))
+        .collect();
+    let mail = calendar_mail("REQUEST", &[lines]);
+    let mut processor = processor(true);
+    process_raw(&mut processor, &mail);
+    let event = only_event(&processor);
+    // Date: Mon, 05 May 2025 10:00:00 +0200
+    assert_eq!(value(&first_vevent(&event), "DTSTAMP"), "20250505T080000Z");
+
+    // The same mail again gives the same event, not a new timestamp.
+    process_raw(&mut processor, &mail);
+    assert_eq!(only_event(&processor), event);
+}
+
+#[test]
+fn a_concurrent_change_is_read_again_and_merged() {
+    let uid = "concurrent";
+    let mut processor = processor(true);
+    process_raw(
+        &mut processor,
+        &calendar_mail("REQUEST", &[parent_lines(uid, 0)]),
+    );
+
+    // The first write fails as if someone changed the event in between.
+    processor.storage.conflicts_to_inject = 1;
+    let status = process_raw(
+        &mut processor,
+        &calendar_mail("REQUEST", &[parent_lines(uid, 1)]),
+    );
+    assert_eq!(
+        status,
+        format!("Updated event with UID {uid}, new sequence: 1")
+    );
+    assert_eq!(only_event(&processor).sequence, 1);
+
+    // It gives up if that keeps happening, and says why.
+    processor.storage.conflicts_to_inject = 10;
+    let failure = processor
+        .process_email(&calendar_mail("REQUEST", &[parent_lines(uid, 2)]))
+        .unwrap_err();
+    assert!(
+        failure
+            .error
+            .to_string()
+            .contains("changed by someone else"),
+        "{}",
+        failure.error
+    );
+    assert_eq!(only_event(&processor).sequence, 1);
 }

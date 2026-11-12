@@ -18,8 +18,11 @@ pub fn validate_event(ics: &str) -> Result<()> {
     validate(&calendar).context("encoding calendar")
 }
 
-/// Checks that a UID is safe to use as an identifier and in a CalDAV path:
-/// letters, digits and `@-_.:+` only, at most 255 characters.
+/// Checks a UID: not empty, at most 255 bytes, no control characters.
+///
+/// RFC 5545 defines UID as a TEXT value, so anything else is allowed,
+/// including spaces (OpenProject) and slashes. Storage is responsible for
+/// turning a UID into a safe resource name.
 pub fn validate_uid(uid: &str) -> Result<()> {
     if uid.is_empty() {
         return Err(Error::new("UID cannot be empty"));
@@ -30,21 +33,15 @@ pub fn validate_uid(uid: &str) -> Result<()> {
             uid.len()
         )));
     }
-    let allowed = |c: char| c.is_ascii_alphanumeric() || "@-_.:+".contains(c);
-    if uid.chars().all(allowed) {
-        return Ok(());
-    }
     if uid.contains(['\r', '\n']) {
         return Err(Error::new("UID contains line breaks which are not allowed"));
     }
-    if uid.chars().any(|c| c.is_ascii_control()) {
+    if uid.chars().any(char::is_control) {
         return Err(Error::new(
             "UID contains control characters which are not allowed",
         ));
     }
-    Err(Error::new(
-        "UID contains invalid characters (only alphanumeric and @-_.:+ allowed)",
-    ))
+    Ok(())
 }
 
 fn check_component(component: &Component) -> Result<()> {
@@ -291,6 +288,11 @@ mod tests {
             "event-123_test",
             "event.123:test",
             "event+123",
+            // UID is a TEXT value: these are unusual but allowed.
+            "Weekly Meeting-host.example-name-0",
+            "event/123",
+            "event#123!",
+            "Besprechung-äöü",
             &"a".repeat(255),
         ];
         for uid in valid {
@@ -303,9 +305,7 @@ mod tests {
             ("event\n123", "line breaks"),
             ("event\r123", "line breaks"),
             ("event\x00123", "control characters"),
-            ("event/123", "invalid characters"),
-            ("event 123", "invalid characters"),
-            ("event#123!", "invalid characters"),
+            ("event\t123", "control characters"),
         ];
         for (uid, message) in invalid {
             let error = validate_uid(uid).unwrap_err().to_string();

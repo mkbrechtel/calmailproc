@@ -2,11 +2,10 @@
 //! and a maildir run may see the same mail again. The stored result must not
 //! depend on either.
 //!
-//! Known gaps, not asserted here:
-//! - updates within a recurring series (test 17):
-//!   `issues/bug-recurring-updates-depend-on-order.md`
-//! - a reply processed before its invitation (tests 05, 06):
-//!   `issues/feature-force-flag-for-reply-or-cancel-without-event.md`
+//! It does not hold for a reply that is processed before its invitation: the
+//! reply is ignored (or, with `force`, stored in place of the invitation).
+//! It also does not hold with `ignore_unknown_cancellations` or
+//! `delete_cancelled`, which keep nothing to remember a cancellation by.
 
 use calmailproc::ical;
 use calmailproc::processor::Processor;
@@ -87,6 +86,47 @@ fn result_does_not_depend_on_processing_order() {
     }
 }
 
+const TEST_17: [&str; 8] = [
+    "test-17-0.eml",
+    "test-17-1.eml",
+    "test-17-2.eml",
+    "test-17-3.eml",
+    "test-17-4.eml",
+    "test-17-5.eml",
+    "test-17-6.eml",
+    "test-17-7.eml",
+];
+
+#[test]
+fn recurring_series_does_not_depend_on_processing_order() {
+    // Test 17: a parent, updates to three occurrences and two cancellations,
+    // with two versions each of the parent and of two occurrences.
+    let expected = stored_after(&TEST_17);
+    // The parent and every occurrence end at their highest sequence.
+    for expected_line in [
+        "SEQUENCE [] 5",
+        "SEQUENCE [] 6",
+        "SEQUENCE [] 7",
+        "SEQUENCE [] 3",
+        "SEQUENCE [] 4",
+    ] {
+        assert_eq!(
+            expected
+                .iter()
+                .filter(|event| event.contains(expected_line))
+                .count(),
+            1,
+            "{expected_line}"
+        );
+    }
+    assert_eq!(expected.len(), 5);
+
+    // All 40320 orders take a while; every 97th is a spread of 416 of them.
+    for order in permutations(&TEST_17).into_iter().step_by(97) {
+        assert_eq!(stored_after(&order), expected, "order {order:?}");
+    }
+}
+
 #[test]
 fn processing_the_same_mails_again_changes_nothing() {
     let all: Vec<&[&str]> = ORDER_INDEPENDENT
@@ -94,16 +134,7 @@ fn processing_the_same_mails_again_changes_nothing() {
         .chain([
             &["test-05-1.eml", "test-05-2.eml"] as &[&str],
             &["test-06-1.eml", "test-06-2.eml"],
-            &[
-                "test-17-0.eml",
-                "test-17-1.eml",
-                "test-17-2.eml",
-                "test-17-3.eml",
-                "test-17-4.eml",
-                "test-17-5.eml",
-                "test-17-6.eml",
-                "test-17-7.eml",
-            ],
+            &TEST_17,
         ])
         .collect();
     for mails in all {

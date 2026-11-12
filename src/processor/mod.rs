@@ -1,25 +1,40 @@
-//! The processor: decides what happens to the calendar event in an email.
+//! The processor: decides what happens to the calendar events in an email.
 //!
 //! It orchestrates the email parser, the iCalendar module and storage, and
-//! holds all business logic: which version of an event wins, how updates to
-//! single occurrences of a recurring event are merged, and how attendance
-//! replies are applied.
+//! holds all business logic.
+//!
+//! A mail's calendar is split by UID; each UID is one stored event. Within an
+//! event every component is handled on its own: the parent event, and each
+//! update to a single occurrence (a VEVENT with RECURRENCE-ID). A component
+//! replaces the stored one unless the stored one is newer, so the result does
+//! not depend on the order in which mails are processed.
 
 pub mod maildir;
 pub mod stdin;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
-use crate::email::{self, Email};
+use crate::email;
 use crate::error::{Context, Error, Result};
-use crate::ical::{self, Comparison, Component, Event};
-use crate::storage::Storage;
+use crate::ical::{self, Calendar, Comparison, Component, Event, Property};
+use crate::storage::{Storage, StoreError, Stored};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 pub struct ProcessorConfig {
+    /// Apply attendance replies (METHOD:REPLY) to stored events.
     pub process_replies: bool,
+    /// Store a reply even if its event is not stored.
+    pub force: bool,
+    /// Ignore a cancellation if its event is not stored. By default it is
+    /// stored, so that the event stays cancelled when the request for it is
+    /// processed later (test 11).
+    pub ignore_unknown_cancellations: bool,
+    /// Delete cancelled events and occurrences instead of marking them.
+    pub delete_cancelled: bool,
+    /// Remove alarms (VALARM) from events before storing them.
+    pub drop_alarms: bool,
 }
 
 /// A failed processing step: what to tell the user, and the technical cause.
@@ -34,199 +49,400 @@ pub type Outcome = std::result::Result<String, Failure>;
 
 pub const NO_CALENDAR_EVENT: &str = "Processed E-Mail without calendar event";
 
+/// How often an event is read and merged again when someone else changed it
+/// between our read and our write.
+const ATTEMPTS: usize = 3;
+
 pub struct Processor<S: Storage> {
     pub storage: S,
-    pub process_replies: bool,
+    pub config: ProcessorConfig,
+}
+
+/// What to do with a stored event after looking at a mail.
+enum Action {
+    Nothing(String),
+    Store(Calendar, String),
+    Delete(String),
 }
 
 impl<S: Storage> Processor<S> {
     pub fn new(storage: S, process_replies: bool) -> Self {
-        Processor {
+        Self::from_config(
             storage,
-            process_replies,
-        }
+            &ProcessorConfig {
+                process_replies,
+                ..ProcessorConfig::default()
+            },
+        )
     }
 
     pub fn from_config(storage: S, config: &ProcessorConfig) -> Self {
-        Self::new(storage, config.process_replies)
+        Processor {
+            storage,
+            config: config.clone(),
+        }
     }
 
     /// Processes one raw email and returns a status message.
     pub fn process_email(&mut self, raw: &[u8]) -> Outcome {
-        let parsed: Email = email::parse(raw)
+        let parsed = email::parse(raw)
             .context("parsing email")
             .map_err(|e| fail("E-Mail parsing error", e))?;
-
-        let Some(event) = parsed.event.filter(|event| !event.uid.is_empty()) else {
+        let Some(event) = parsed.event else {
             return Ok(NO_CALENDAR_EVENT.to_string());
         };
-        ical::validate_uid(&event.uid)
-            .map_err(|e| fail(format!("Invalid UID for calendar event: {e}"), e))?;
+        let calendar = ical::decode(&event.raw_data)
+            .context("parsing email")
+            .map_err(|e| fail("E-Mail parsing error", e))?;
+        let received = parsed
+            .date
+            .as_deref()
+            .and_then(|date| DateTime::parse_from_rfc3339(date).ok())
+            .map(|date| date.with_timezone(&Utc))
+            .unwrap_or_else(Utc::now);
 
-        match event.method.as_str() {
-            "REPLY" => self.process_event_reply(&event),
-            // REQUEST, CANCEL and everything else (e.g. PUBLISH) are handled alike.
-            _ => self.process_event(&event),
+        // Every UID is an event of its own. All are processed; the first
+        // failure is reported.
+        let mut statuses = Vec::new();
+        let mut failure = None;
+        for (uid, events) in split_by_uid(&calendar).map_err(|e| fail("E-Mail parsing error", e))? {
+            match self.process_calendar(&uid, &event.method, events, received) {
+                Ok(status) => statuses.push(status),
+                Err(error) => failure = failure.or(Some(error)),
+            }
+        }
+        match failure {
+            Some(failure) => Err(failure),
+            None => Ok(statuses.join("; ")),
         }
     }
 
-    /// Stores a new event or merges it with the stored one.
-    fn process_event(&mut self, event: &Event) -> Outcome {
-        let uid = &event.uid;
-        ical::validate_event(&event.raw_data)
+    /// Processes the components of one event.
+    fn process_calendar(
+        &mut self,
+        uid: &str,
+        method: &str,
+        mut incoming: Calendar,
+        received: DateTime<Utc>,
+    ) -> Outcome {
+        ical::validate_uid(uid)
+            .map_err(|e| fail(format!("Invalid UID for calendar event: {e}"), e))?;
+        if method == "REPLY" && !self.config.process_replies {
+            return Ok("Ignoring calendar REPLY method as configured".to_string());
+        }
+
+        normalize(&mut incoming, received, &self.config);
+        ical::validate(&incoming)
+            .context("encoding calendar")
             .context(&format!("validation error for event {uid}"))
             .map_err(|e| fail(format!("Invalid calendar data for event with UID {uid}"), e))?;
 
-        let Some(existing) = self.get_existing(uid)? else {
-            self.store(event, None, "Error storing new event", "storing event")?;
-            return Ok(format!("Stored new event with UID {uid}"));
-        };
+        for _ in 0..ATTEMPTS {
+            let stored = self
+                .storage
+                .get_event(uid)
+                .context("looking up existing event")
+                .map_err(|e| fail("Error looking up existing event", e))?;
+            let stored_calendar = stored
+                .as_ref()
+                .map(|stored| ical::decode(&stored.event.raw_data))
+                .transpose()
+                .context("parsing existing event data")
+                .map_err(|e| fail("Error reading stored event", e))?;
 
-        // An update to one occurrence is always merged, whatever the sequence
-        // number of the stored parent event.
-        if event.is_recurring_update() {
-            let updated = handle_recurring_event(&existing, event)
-                .context("handling recurring instance")
-                .map_err(|e| fail("Error handling recurring instance", e))?;
-            self.validate_and_store(&updated, &existing, "instance update")?;
-            return Ok(format!("Updated recurring event instance with UID {uid}"));
+            let action = if method == "REPLY" {
+                self.apply_reply(uid, &incoming, stored_calendar.as_ref())?
+            } else {
+                self.apply_update(uid, method, &incoming, stored_calendar.as_ref())?
+            };
+            match self.perform(uid, action, stored.as_ref(), stored_calendar.as_ref())? {
+                Some(status) => return Ok(status),
+                // Someone else changed the event in between: read it again.
+                None => continue,
+            }
         }
-
-        // The stored data already has occurrence updates: replace the parent
-        // event and keep them.
-        if existing.is_recurring_update() {
-            let updated = handle_parent_event_update(&existing, event)
-                .context("handling parent event update")
-                .map_err(|e| fail("Error handling parent event update", e))?;
-            self.validate_and_store(&updated, &existing, "parent update")?;
-            return Ok(format!(
-                "Updated parent event while preserving instances with UID {uid}"
-            ));
-        }
-
-        let comparison = ical::compare_events(event, &existing)
-            .context("comparing events")
-            .map_err(|e| fail("Error comparing events", e))?;
-        if comparison == Comparison::SecondNewer {
-            return Ok(format!(
-                "Not processing older event (sequence: {} vs {}, DTSTAMP comparison) with UID {uid}",
-                event.sequence, existing.sequence
-            ));
-        }
-
-        let updated = handle_parent_event_update(&existing, event)
-            .context("handling parent event update")
-            .map_err(|e| fail("Error handling parent event update", e))?;
-        self.validate_and_store(&updated, &existing, "parent update")?;
-        Ok(format!(
-            "Updated event with UID {uid}, new sequence: {}",
-            event.sequence
+        Err(fail(
+            "Error storing event",
+            Error::new(format!(
+                "storing event {uid}: the stored event was changed by someone else {ATTEMPTS} times in a row"
+            )),
         ))
     }
 
-    /// Applies an attendance reply (METHOD:REPLY) to the stored event.
-    fn process_event_reply(&mut self, reply: &Event) -> Outcome {
-        if !self.process_replies {
-            return Ok("Ignoring calendar REPLY method as configured".to_string());
-        }
-        let uid = &reply.uid;
-        ical::validate_event(&reply.raw_data)
-            .context(&format!("validation error for event reply {uid}"))
-            .map_err(|e| {
-                fail(
-                    format!("Invalid calendar data for event reply with UID {uid}"),
-                    e,
+    /// Carries out an action. Returns `None` if storage reported a conflict.
+    fn perform(
+        &mut self,
+        uid: &str,
+        action: Action,
+        stored: Option<&Stored>,
+        stored_calendar: Option<&Calendar>,
+    ) -> std::result::Result<Option<String>, Failure> {
+        let version = stored.map(|stored| &stored.version);
+        let (result, status, failure_status) = match action {
+            Action::Nothing(status) => return Ok(Some(status)),
+            Action::Delete(status) => {
+                let version = version.expect("only a stored event is deleted");
+                (
+                    self.storage.delete_event(version),
+                    status,
+                    "Error deleting event",
                 )
-            })?;
+            }
+            Action::Store(calendar, status) => {
+                let event = prepare_event_for_storage(uid, calendar, stored_calendar)
+                    .context("preparing event")
+                    .map_err(|e| fail("Error preparing event for storage", e))?;
+                let failure_status = if stored.is_some() {
+                    "Error storing updated event"
+                } else {
+                    "Error storing new event"
+                };
+                (
+                    self.storage.store_event(&event, version),
+                    status,
+                    failure_status,
+                )
+            }
+        };
+        match result {
+            Ok(()) => Ok(Some(status)),
+            Err(StoreError::Conflict) => Ok(None),
+            Err(StoreError::Other(error)) => Err(fail(failure_status, error)),
+        }
+    }
 
-        let Some(mut existing) = self.get_existing(uid)? else {
-            self.store(
-                reply,
-                None,
-                "Error storing new reply event",
-                "storing event",
-            )?;
-            return Ok(format!("Stored new reply event with UID {uid}"));
+    /// REQUEST, CANCEL, PUBLISH and anything else that carries event data:
+    /// merges the mail's components into the stored event.
+    fn apply_update(
+        &self,
+        uid: &str,
+        method: &str,
+        incoming: &Calendar,
+        stored: Option<&Calendar>,
+    ) -> std::result::Result<Action, Failure> {
+        let is_cancel = method == "CANCEL";
+        let delete = is_cancel && self.config.delete_cancelled;
+
+        let Some(stored) = stored else {
+            // A cancellation for an event that is not stored is kept as a
+            // cancelled event, unless configured otherwise: mails are not
+            // always processed in the order they were sent, and the request
+            // for it must not bring the event back (test 11).
+            if is_cancel && (delete || self.config.ignore_unknown_cancellations) {
+                return Ok(Action::Nothing(format!(
+                    "Ignoring cancellation for unknown event with UID {uid}"
+                )));
+            }
+            let mut new = incoming.clone();
+            if is_cancel {
+                new.events_mut().for_each(mark_cancelled);
+            }
+            return Ok(Action::Store(
+                new,
+                format!("Stored new event with UID {uid}"),
+            ));
         };
 
-        let stored = existing.clone();
-        if let Err(error) = update_attendee_status(reply, &mut existing) {
-            eprintln!("Warning: Failed to update attendee status: {error}");
-            self.store(
-                reply,
-                Some(&stored),
-                "Error storing reply event",
-                "storing event",
-            )?;
-            return Ok(format!(
-                "Stored reply event with UID {uid} (attendee update failed)"
-            ));
+        let had_occurrences = stored.events().any(is_occurrence);
+        let mut merged = stored.clone();
+        let mut new_parent_sequence = None;
+        let mut occurrences_changed = 0;
+        let mut occurrences_removed = 0;
+        let mut delete_event = false;
+        let mut skipped = None;
+
+        for component in incoming.events() {
+            let recurrence_id = component.value("RECURRENCE-ID");
+            let position = merged
+                .components
+                .iter()
+                .position(|c| c.name == "VEVENT" && c.value("RECURRENCE-ID") == recurrence_id);
+
+            // An older version never replaces a newer one.
+            if let Some(index) = position {
+                let stored_component = &merged.components[index];
+                let comparison = ical::compare_components(component, stored_component)
+                    .context("comparing events")
+                    .map_err(|e| fail("Error comparing events", e))?;
+                if comparison == Comparison::SecondNewer {
+                    skipped.get_or_insert((
+                        ical::sequence(component),
+                        ical::sequence(stored_component),
+                    ));
+                    continue;
+                }
+            }
+
+            let mut component = component.clone();
+            if is_cancel {
+                mark_cancelled(&mut component);
+            }
+            match (recurrence_id.is_some(), delete) {
+                // The parent event is cancelled and cancelled events are deleted.
+                (false, true) => delete_event = true,
+                // A new version of the parent event. Calendar properties and
+                // time zones come with it; stored occurrence updates stay.
+                (false, false) => {
+                    new_parent_sequence = Some(ical::sequence(&component));
+                    let mut components: Vec<Component> = incoming
+                        .components
+                        .iter()
+                        .filter(|c| c.name != "VEVENT")
+                        .cloned()
+                        .collect();
+                    components.push(component);
+                    components.extend(
+                        merged
+                            .components
+                            .iter()
+                            .filter(|c| is_occurrence(c))
+                            .cloned(),
+                    );
+                    let previous = std::mem::replace(
+                        &mut merged,
+                        Calendar {
+                            name: incoming.name.clone(),
+                            properties: incoming.properties.clone(),
+                            components,
+                        },
+                    );
+                    add_missing_time_zones(&mut merged, &previous);
+                }
+                // One occurrence is cancelled and cancelled ones are deleted.
+                (true, true) => {
+                    if let Some(index) = position {
+                        merged.components.remove(index);
+                    }
+                    exclude_occurrence(&mut merged, &component);
+                    occurrences_removed += 1;
+                }
+                // A new version of one occurrence.
+                (true, false) => {
+                    match position {
+                        Some(index) => merged.components[index] = component,
+                        None => merged.components.push(component),
+                    }
+                    add_missing_time_zones(&mut merged, incoming);
+                    occurrences_changed += 1;
+                }
+            }
         }
 
-        ical::validate_event(&existing.raw_data)
-            .context(&format!(
-                "validation error after attendee update for event {uid}"
-            ))
-            .map_err(|e| {
-                fail(
-                    format!("Invalid calendar data after attendee update for event with UID {uid}"),
-                    e,
-                )
-            })?;
-        self.store(
-            &existing,
-            Some(&stored),
-            "Error storing updated event with attendee status",
-            "storing updated event",
-        )?;
-        Ok(format!("Updated attendee status for event with UID {uid}"))
+        if delete_event {
+            return Ok(Action::Delete(format!(
+                "Deleted cancelled event with UID {uid}"
+            )));
+        }
+        let status = match new_parent_sequence {
+            Some(_) if had_occurrences => {
+                format!("Updated parent event while preserving instances with UID {uid}")
+            }
+            Some(sequence) => format!("Updated event with UID {uid}, new sequence: {sequence}"),
+            None if occurrences_changed > 0 => {
+                format!("Updated recurring event instance with UID {uid}")
+            }
+            None if occurrences_removed > 0 => {
+                format!("Removed cancelled occurrence from event with UID {uid}")
+            }
+            None => {
+                let (new, stored) = skipped.unwrap_or_default();
+                return Ok(Action::Nothing(format!(
+                    "Not processing older event (sequence: {new} vs {stored}, DTSTAMP comparison) with UID {uid}"
+                )));
+            }
+        };
+        Ok(Action::Store(merged, status))
     }
 
-    fn get_existing(&mut self, uid: &str) -> std::result::Result<Option<Event>, Failure> {
-        self.storage
-            .get_event(uid)
-            .context("looking up existing event")
-            .map_err(|e| fail("Error looking up existing event", e))
-    }
+    /// METHOD:REPLY: sets the replying attendee's status in the stored event.
+    /// A reply only ever changes that one attendee.
+    fn apply_reply(
+        &self,
+        uid: &str,
+        reply: &Calendar,
+        stored: Option<&Calendar>,
+    ) -> std::result::Result<Action, Failure> {
+        let Some(stored) = stored else {
+            // A reply is not an event. Stored as one, it would also keep the
+            // real invitation out if that is processed later.
+            if !self.config.force {
+                return Ok(Action::Nothing(format!(
+                    "Ignoring reply for unknown event with UID {uid}"
+                )));
+            }
+            return Ok(Action::Store(
+                reply.clone(),
+                format!("Stored new reply event with UID {uid}"),
+            ));
+        };
 
-    fn validate_and_store(
-        &mut self,
-        event: &Event,
-        stored: &Event,
-        step: &str,
-    ) -> std::result::Result<(), Failure> {
-        let uid = &event.uid;
-        ical::validate_event(&event.raw_data)
-            .context(&format!("validation error after {step} for event {uid}"))
-            .map_err(|e| {
-                fail(
-                    format!("Invalid calendar data after {step} for event with UID {uid}"),
-                    e,
-                )
-            })?;
-        self.store(
-            event,
-            Some(stored),
-            "Error storing updated event",
-            "storing updated event",
-        )
-    }
+        let invalid = |reason: &str| {
+            fail(
+                format!("Invalid reply for event with UID {uid}"),
+                Error::new(format!("reply for event {uid}: {reason}")),
+            )
+        };
+        let mut merged = stored.clone();
+        let mut added = None;
+        let mut applied = false;
 
-    /// Stores an event. `stored` is the event it replaces, if there is one.
-    fn store(
-        &mut self,
-        event: &Event,
-        stored: Option<&Event>,
-        status: &str,
-        context: &str,
-    ) -> std::result::Result<(), Failure> {
-        let prepared = prepare_event_for_storage(event, stored)
-            .context("preparing event")
-            .map_err(|e| fail("Error preparing event for storage", e))?;
-        self.storage
-            .store_event(&prepared)
-            .context(context)
-            .map_err(|e| fail(status, e))
+        for reply_event in reply.events() {
+            let attendee = reply_event
+                .prop("ATTENDEE")
+                .ok_or_else(|| invalid("no ATTENDEE property in reply"))?;
+            let status = attendee
+                .param("PARTSTAT")
+                .filter(|status| !status.is_empty())
+                .ok_or_else(|| invalid("no PARTSTAT found in reply"))?;
+            let comment = reply_event.value("COMMENT").and_then(response_comment);
+
+            // The reply is for the parent event, or for the occurrence it names.
+            let recurrence_id = reply_event.value("RECURRENCE-ID");
+            let Some(target) = merged
+                .events_mut()
+                .find(|event| event.value("RECURRENCE-ID") == recurrence_id)
+            else {
+                continue;
+            };
+            applied = true;
+
+            // Addresses are compared without regard to case: `MAILTO:` and
+            // `mailto:` are the same, and Outlook sends the former.
+            let stored_attendee = target
+                .properties
+                .iter_mut()
+                .find(|p| p.name == "ATTENDEE" && p.value.eq_ignore_ascii_case(&attendee.value));
+            match stored_attendee {
+                Some(stored_attendee) => {
+                    stored_attendee.set_param("PARTSTAT", status);
+                    set_response_comment(stored_attendee, comment);
+                }
+                // Someone who was not invited (a delegate, an alias, a
+                // forwarded invitation) is added as an attendee.
+                None => {
+                    let mut new_attendee = attendee.clone();
+                    set_response_comment(&mut new_attendee, comment);
+                    let after_attendees = target
+                        .properties
+                        .iter()
+                        .rposition(|p| p.name == "ATTENDEE")
+                        .map_or(target.properties.len(), |index| index + 1);
+                    target.properties.insert(after_attendees, new_attendee);
+                    added = Some(attendee.value.clone());
+                }
+            }
+        }
+
+        if !applied {
+            return Ok(Action::Nothing(format!(
+                "Ignoring reply for an occurrence that is not stored, event with UID {uid}"
+            )));
+        }
+        let status = match added {
+            Some(address) => format!("Added attendee {address} to event with UID {uid}"),
+            None => format!("Updated attendee status for event with UID {uid}"),
+        };
+        Ok(Action::Store(merged, status))
     }
 }
 
@@ -237,131 +453,151 @@ fn fail(status: impl Into<String>, error: Error) -> Failure {
     }
 }
 
-/// Merges an update to one occurrence (a VEVENT with RECURRENCE-ID) into the
-/// stored calendar: replaces the occurrence if it is already there, adds it
-/// otherwise. A cancellation marks the occurrence as cancelled.
-fn handle_recurring_event(existing: &Event, new: &Event) -> Result<Event> {
-    let new_cal = ical::decode(&new.raw_data).context("parsing new event data")?;
-    let mut existing_cal =
-        ical::decode(&existing.raw_data).context("parsing existing event data")?;
+fn is_occurrence(component: &Component) -> bool {
+    component.name == "VEVENT" && component.has_prop("RECURRENCE-ID")
+}
 
-    let mut occurrence = new_cal
-        .events()
-        .find(|e| e.has_prop("RECURRENCE-ID"))
-        .cloned()
-        .ok_or_else(|| Error::new("no recurring event found in update"))?;
-    let recurrence_id = occurrence
-        .value("RECURRENCE-ID")
-        .unwrap_or_default()
-        .to_string();
-    let is_cancel = new.method == "CANCEL";
+fn mark_cancelled(event: &mut Component) {
+    event.set_prop("STATUS", "CANCELLED");
+}
 
-    let stored = existing_cal
-        .events_mut()
-        .find(|e| e.value("RECURRENCE-ID") == Some(recurrence_id.as_str()));
-    match stored {
-        Some(stored) if is_cancel => stored.set_prop("STATUS", "CANCELLED"),
-        Some(stored) => *stored = occurrence,
-        None => {
-            if is_cancel {
-                occurrence.set_prop("STATUS", "CANCELLED");
-            }
-            existing_cal.components.push(occurrence);
+/// Splits a calendar into one calendar per UID, in the order the UIDs appear.
+/// Each keeps the calendar properties and all components that are not events
+/// (time zones).
+fn split_by_uid(calendar: &Calendar) -> Result<Vec<(String, Calendar)>> {
+    let mut uids: Vec<&str> = Vec::new();
+    for event in calendar.events() {
+        let uid = event
+            .value("UID")
+            .ok_or_else(|| Error::new("parsing email: VEVENT missing required UID property"))?;
+        if !uids.contains(&uid) {
+            uids.push(uid);
         }
     }
+    Ok(uids
+        .into_iter()
+        .map(|uid| {
+            let mut events = calendar.clone();
+            events
+                .components
+                .retain(|c| c.name != "VEVENT" || c.value("UID") == Some(uid));
+            (uid.to_string(), events)
+        })
+        .collect())
+}
 
-    // DTSTAMP is required; add it where a sender left it out.
-    let now = Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
-    for event in existing_cal.events_mut() {
+/// Repairs and sanitizes calendar data from a mail before it is used.
+fn normalize(calendar: &mut Calendar, received: DateTime<Utc>, config: &ProcessorConfig) {
+    // DTSTAMP is required, but Outlook leaves it out of changed occurrences
+    // (test 23). Use the one of another event in the mail, else the mail's date.
+    let dtstamp = calendar
+        .events()
+        .find_map(|event| event.value("DTSTAMP"))
+        .map(str::to_string)
+        .unwrap_or_else(|| received.format("%Y%m%dT%H%M%SZ").to_string());
+    for event in calendar.events_mut() {
         if !event.has_prop("DTSTAMP") {
-            event.set_prop("DTSTAMP", &now);
+            event.set_prop("DTSTAMP", &dtstamp);
+        }
+        if config.drop_alarms {
+            event.components.retain(|c| c.name != "VALARM");
         }
     }
-
-    Ok(Event {
-        uid: existing.uid.clone(),
-        raw_data: ical::encode(&existing_cal).context("encoding updated calendar")?,
-        summary: existing.summary.clone(),
-        method: existing.method.clone(),
-        sequence: existing.sequence,
-    })
+    sanitize(calendar);
 }
 
-/// Replaces the parent event with the new one and keeps the stored occurrence
-/// updates (VEVENTs with RECURRENCE-ID).
-fn handle_parent_event_update(existing: &Event, new: &Event) -> Result<Event> {
-    let new_cal = ical::decode(&new.raw_data).context("parsing new parent event data")?;
-    let existing_cal = ical::decode(&existing.raw_data).context("parsing existing event data")?;
-
-    let is_occurrence = |c: &Component| c.name == "VEVENT" && c.has_prop("RECURRENCE-ID");
-    if !new_cal.events().any(|e| !is_occurrence(e)) {
-        return Err(Error::new("no parent event component found in update"));
-    }
-
-    // Take the new calendar (properties, time zones, first parent event) and
-    // append the stored occurrence updates.
-    let mut updated = new_cal;
-    let mut parent_seen = false;
-    updated.components.retain(|c| {
-        if c.name != "VEVENT" {
-            return true;
+/// Removes what a sender must not be able to put into the calendar.
+fn sanitize(component: &mut Component) {
+    for property in &mut component.properties {
+        match property.name.as_str() {
+            // A calendar client that later sends the event on would read the
+            // local file and attach it. Like Evolution, keep the reference
+            // but make it unusable.
+            "ATTACH" if has_prefix(&property.value, "file:") => {
+                property.value.insert(0, 'x');
+            }
+            // These ask the server to send scheduling messages, or report
+            // that it did. They do not belong in a mail (RFC 6638, 7.2, 7.3).
+            "ORGANIZER" | "ATTENDEE" => {
+                property.remove_param("SCHEDULE-FORCE-SEND");
+                property.remove_param("SCHEDULE-STATUS");
+            }
+            _ => {}
         }
-        let keep = !is_occurrence(c) && !parent_seen;
-        parent_seen |= keep;
-        keep
-    });
-    updated.components.extend(
-        existing_cal
+    }
+    component.components.iter_mut().for_each(sanitize);
+}
+
+fn has_prefix(text: &str, prefix: &str) -> bool {
+    text.len() >= prefix.len() && text[..prefix.len()].eq_ignore_ascii_case(prefix)
+}
+
+/// Adds the VTIMEZONE components of `other` that `calendar` does not have.
+fn add_missing_time_zones(calendar: &mut Calendar, other: &Calendar) {
+    for zone in other.components.iter().filter(|c| c.name == "VTIMEZONE") {
+        let known = calendar
             .components
-            .into_iter()
-            .filter(|c| is_occurrence(c)),
-    );
-
-    Ok(Event {
-        uid: existing.uid.clone(),
-        raw_data: ical::encode(&updated).context("encoding updated calendar")?,
-        summary: new.summary.clone(),
-        method: new.method.clone(),
-        sequence: new.sequence,
-    })
+            .iter()
+            .any(|c| c.name == "VTIMEZONE" && c.value("TZID") == zone.value("TZID"));
+        if !known {
+            let before_events = calendar
+                .components
+                .iter()
+                .position(|c| c.name == "VEVENT")
+                .unwrap_or(calendar.components.len());
+            calendar.components.insert(before_events, zone.clone());
+        }
+    }
 }
 
-/// Sets the replying attendee's PARTSTAT in the stored event.
-fn update_attendee_status(reply: &Event, stored: &mut Event) -> Result<()> {
-    let reply_cal = ical::decode(&reply.raw_data).context("parsing event data")?;
-    let mut stored_cal = ical::decode(&stored.raw_data).context("parsing existing event data")?;
-
-    let reply_event = reply_cal
-        .events()
-        .next()
-        .ok_or_else(|| Error::new("no VEVENT component found in reply"))?;
-    let attendee = reply_event
-        .prop("ATTENDEE")
-        .ok_or_else(|| Error::new("no ATTENDEE property in reply"))?;
-    let status = attendee
-        .param("PARTSTAT")
-        .filter(|status| !status.is_empty())
-        .ok_or_else(|| Error::new("no PARTSTAT found in reply"))?;
-
-    // The reply applies to the parent event, or to the occurrence it names.
-    // Addresses are compared without regard to case: `MAILTO:` and `mailto:`
-    // are the same, and Outlook sends the former.
-    let stored_attendee = stored_cal
-        .events_mut()
-        .filter(|event| matches_recurrence_id(reply_event, event))
-        .flat_map(|event| event.properties.iter_mut())
-        .find(|p| p.name == "ATTENDEE" && p.value.eq_ignore_ascii_case(&attendee.value))
-        .ok_or_else(|| Error::new(format!("attendee {} not found in event", attendee.value)))?;
-    stored_attendee.set_param("PARTSTAT", status);
-
-    stored.raw_data = ical::encode(&stored_cal).context("encoding updated calendar")?;
-    Ok(())
+/// Removes an occurrence from the series by adding an EXDATE for it to the
+/// parent event.
+fn exclude_occurrence(calendar: &mut Calendar, occurrence: &Component) {
+    let Some(recurrence_id) = occurrence.prop("RECURRENCE-ID") else {
+        return;
+    };
+    let Some(parent) = calendar.events_mut().find(|event| !is_occurrence(event)) else {
+        return;
+    };
+    let already_excluded = parent.props("EXDATE").any(|exdate| {
+        exdate
+            .value
+            .split(',')
+            .any(|date| date == recurrence_id.value)
+    });
+    if !already_excluded {
+        let mut exdate = Property::new("EXDATE", &recurrence_id.value);
+        exdate.params = recurrence_id
+            .params
+            .iter()
+            .filter(|(key, _)| !key.eq_ignore_ascii_case("RANGE"))
+            .cloned()
+            .collect();
+        parent.properties.push(exdate);
+    }
 }
 
-/// True if both components are the parent event, or both are the same
-/// occurrence.
-fn matches_recurrence_id(a: &Component, b: &Component) -> bool {
-    a.value("RECURRENCE-ID") == b.value("RECURRENCE-ID")
+/// A reply's comment as a parameter value: one line, without quotes.
+fn response_comment(comment: &str) -> Option<String> {
+    let comment: String = comment
+        .chars()
+        .map(|c| match c {
+            '"' => '\'',
+            c if c.is_control() => ' ',
+            c => c,
+        })
+        .collect();
+    let comment = comment.split_whitespace().collect::<Vec<_>>().join(" ");
+    (!comment.is_empty()).then_some(comment)
+}
+
+/// Stores the comment of a reply with the attendee, where Evolution and
+/// Google Calendar look for it. A reply without comment clears an old one.
+fn set_response_comment(attendee: &mut Property, comment: Option<String>) {
+    match comment {
+        Some(comment) => attendee.set_param("X-RESPONSE-COMMENT", &comment),
+        None => attendee.remove_param("X-RESPONSE-COMMENT"),
+    }
 }
 
 /// Prepares an event for the CalDAV server. Every stored event passes through
@@ -370,16 +606,17 @@ fn matches_recurrence_id(a: &Component, b: &Component) -> bool {
 /// - Removes the METHOD property, which belongs to the mail transport.
 /// - Sets the SCHEDULE-AGENT parameter of every ORGANIZER and ATTENDEE; see
 ///   [`set_schedule_agents`].
-fn prepare_event_for_storage(event: &Event, stored: Option<&Event>) -> Result<Event> {
-    let mut calendar = ical::decode(&event.raw_data).context("decoding calendar")?;
+fn prepare_event_for_storage(
+    uid: &str,
+    mut calendar: Calendar,
+    stored: Option<&Calendar>,
+) -> Result<Event> {
     calendar.remove_props("METHOD");
-    let stored_calendar = stored
-        .map(|stored| ical::decode(&stored.raw_data).context("decoding stored calendar"))
-        .transpose()?;
-    set_schedule_agents(&mut calendar, stored_calendar.as_ref());
+    set_schedule_agents(&mut calendar, stored);
+    let raw_data = ical::encode(&calendar).context("encoding calendar")?;
     Ok(Event {
-        raw_data: ical::encode(&calendar).context("encoding calendar")?,
-        ..event.clone()
+        uid: uid.to_string(),
+        ..ical::parse_ical_data(&raw_data)?
     })
 }
 
@@ -395,9 +632,9 @@ fn prepare_event_for_storage(event: &Event, stored: Option<&Event>) -> Result<Ev
 ///   (RFC 6638, section 3.2.1.2). Evolution has the same rule.
 fn set_schedule_agents(calendar: &mut Component, stored: Option<&Component>) {
     const PARAM: &str = "SCHEDULE-AGENT";
-    let is_participant = |p: &ical::Property| p.name == "ORGANIZER" || p.name == "ATTENDEE";
+    let is_participant = |p: &Property| p.name == "ORGANIZER" || p.name == "ATTENDEE";
 
-    let stored_participants: Vec<&ical::Property> = stored
+    let stored_participants: Vec<&Property> = stored
         .iter()
         .flat_map(|stored| stored.events())
         .flat_map(|vevent| vevent.properties.iter())

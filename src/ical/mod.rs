@@ -21,7 +21,7 @@
 mod compare;
 mod validate;
 
-pub use compare::{Comparison, compare_events, parse_ical_time};
+pub use compare::{Comparison, compare_components, compare_events, parse_ical_time, sequence};
 pub use validate::{validate, validate_event, validate_uid};
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
@@ -160,16 +160,30 @@ impl Event {
 
 /// Parses iCalendar text into a calendar tree. Does not check cardinality;
 /// see [`validate`].
+///
+/// Empty lines are ignored. The standard does not allow them, but Horde puts
+/// them in the middle of folded lines (tests 21 and 22); without the empty
+/// line the continuation joins the line before it again.
 pub fn decode(ics: &str) -> Result<Calendar> {
-    let unfolded = ic::unfold(ics);
-    if let Some(line) = unfolded
-        .lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty() && !line.contains(':'))
-    {
+    // Line endings are normalised too: mails mix CRLF and LF.
+    let lines: Vec<&str> = ics.lines().filter(|line| !line.is_empty()).collect();
+    let unfolded = ic::unfold(&lines.join("\n"));
+    // The parser is lenient in ways that corrupt data: it merges a line
+    // without ':' into the next one and splits a name at a space. Check the
+    // basic shape of every content line first.
+    for (number, line) in unfolded.lines().enumerate() {
+        let name = line.split([';', ':']).next().unwrap_or_default();
+        let problem = if !line.contains(':') {
+            "without ':'"
+        } else if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+            "with an invalid property name"
+        } else {
+            continue;
+        };
         return Err(Error::new(format!(
-            "decoding iCal data: malformed content line without ':': {}",
-            truncate(line, 60)
+            "decoding iCal data: malformed content line {} {problem}: {}",
+            number + 1,
+            truncate(line.trim(), 60)
         )));
     }
 
@@ -178,7 +192,7 @@ pub fn decode(ics: &str) -> Result<Calendar> {
     // attachment must never take down a whole maildir run.
     let roots = catch_unwind(AssertUnwindSafe(|| ic::read_components(&unfolded)))
         .map_err(|_| Error::new("decoding iCal data: panic in decoder"))?
-        .map_err(|e| Error::new(format!("decoding iCal data: {}", first_line(&e))))?;
+        .map_err(|e| Error::new(format!("decoding iCal data: {}", describe(&e, &unfolded))))?;
 
     let root = roots
         .into_iter()
@@ -187,6 +201,22 @@ pub fn decode(ics: &str) -> Result<Calendar> {
     let calendar = to_owned(root);
     check_no_line_breaks(&calendar)?;
     Ok(calendar)
+}
+
+/// The parser reports only "at line N, in Satisfy". Add the text of that line
+/// (of the unfolded data), which is what one needs to find the problem.
+fn describe(parser_error: &str, unfolded: &str) -> String {
+    let message = first_line(parser_error);
+    let line = message
+        .split("at line ")
+        .nth(1)
+        .and_then(|rest| rest.split(|c: char| !c.is_ascii_digit()).next())
+        .and_then(|number| number.parse::<usize>().ok())
+        .and_then(|number| unfolded.lines().nth(number.saturating_sub(1)));
+    match line {
+        Some(line) => format!("{message} {}", truncate(line.trim(), 60)),
+        None => message,
+    }
 }
 
 /// Validates a calendar and writes it as iCalendar text.
@@ -354,7 +384,43 @@ mod tests {
         // From test-12: the parser would merge the UID line into the CN parameter.
         let ics = SIMPLE.replace("SUMMARY:Test Event", "ORGANIZER;CN=Sixt SE");
         let error = decode(&ics).unwrap_err().to_string();
-        assert!(error.contains("malformed content line"), "{error}");
+        assert!(
+            error.contains("malformed content line 7 without ':': ORGANIZER;CN=Sixt SE"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn decode_ignores_empty_lines_even_inside_folded_lines() {
+        // Horde (tests 21, 22): an empty line in the middle of a folded line.
+        let ics = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:x\n\nBEGIN:VEVENT\nUID:folded\nATTENDEE;ROLE=REQ-PARTICIPANT;CN=someone@exam\n\n ple.com:mailto:someone@example.com\r\nDESCRIPTION:first\r\n\r\n  second\nEND:VEVENT\nEND:VCALENDAR\n";
+        let calendar = decode(ics).unwrap();
+        let event = calendar.events().next().unwrap();
+        let attendee = event.prop("ATTENDEE").unwrap();
+        assert_eq!(attendee.param("CN"), Some("someone@example.com"));
+        assert_eq!(attendee.value, "mailto:someone@example.com");
+        assert_eq!(event.value("DESCRIPTION"), Some("first second"));
+    }
+
+    #[test]
+    fn decode_rejects_invalid_property_names() {
+        // The parser would read this as an empty "SUM" and a "MARY" property.
+        let ics = SIMPLE.replace("SUMMARY:Test Event", "SUM MARY:broken name");
+        let error = decode(&ics).unwrap_err().to_string();
+        assert!(
+            error.contains("line 7 with an invalid property name: SUM MARY:broken name"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn parser_errors_show_the_offending_line() {
+        let error = describe(
+            "error: 0: at line 3, in Satisfy:",
+            "A:1\nB:2\nC:the culprit\nD:4",
+        );
+        assert_eq!(error, "error: 0: at line 3, in Satisfy: C:the culprit");
+        assert_eq!(describe("something else", "A:1"), "something else");
     }
 
     #[test]

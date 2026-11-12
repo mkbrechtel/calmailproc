@@ -52,9 +52,13 @@ mod tests {
     #[test]
     fn parses_full_config() {
         let config = parse(
-            "webdav:\n  url: http://localhost:15232\n  user: test\n  pass: \"p:a#ss\"\n  calendar: /user/calendars/calendar3/\n\nprocessor:\n  process_replies: true\n\nmaildir:\n  path: test/maildir\n  verbose: true\n",
+            "webdav:\n  url: http://localhost:15232\n  user: test\n  pass: \"p:a#ss\"\n  calendar: /user/calendars/calendar3/\n\nprocessor:\n  process_replies: true\n  force: true\n  ignore_unknown_cancellations: true\n  delete_cancelled: true\n  drop_alarms: true\n\nmaildir:\n  path: test/maildir\n  verbose: true\n",
         )
         .unwrap();
+        assert!(config.processor.force);
+        assert!(config.processor.ignore_unknown_cancellations);
+        assert!(config.processor.delete_cancelled);
+        assert!(config.processor.drop_alarms);
         assert_eq!(config.webdav.url, "http://localhost:15232");
         assert_eq!(config.webdav.user, "test");
         assert_eq!(config.webdav.pass, "p:a#ss");
@@ -71,6 +75,10 @@ mod tests {
         assert_eq!(config.webdav.url, "http://example.com");
         assert_eq!(config.webdav.user, "");
         assert!(!config.processor.process_replies);
+        assert!(!config.processor.force);
+        assert!(!config.processor.ignore_unknown_cancellations);
+        assert!(!config.processor.delete_cancelled);
+        assert!(!config.processor.drop_alarms);
         assert_eq!(config.maildir.path, "");
         assert!(parse("").is_ok());
     }

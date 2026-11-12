@@ -6,7 +6,7 @@
 
 use mail_parser::{AddressList, MessageParser};
 
-use crate::error::{Context, Error, Result};
+use crate::error::{Error, Result};
 use crate::ical::{self, Event};
 
 /// A parsed email with its calendar event, if it has one.
@@ -43,7 +43,14 @@ pub fn parse(raw: &[u8]) -> Result<Email> {
 
     // Parts of attached messages (message/rfc822) are not searched: a forwarded
     // mail's invitation is only used if it is part of the outer message.
+    let mut first_error = None;
     for part in message.root().parts() {
+        // A multipart is a container, whatever its Content-Type says.
+        // OpenProject puts `method=` and `name=....ics` on the outer
+        // multipart/mixed (test 20).
+        if part.is_multipart() {
+            continue;
+        }
         let is_calendar = part.is_content_type("text", "calendar")
             || part.is_content_type("application", "ics")
             || part.is_content_type("text", "x-vcalendar")
@@ -57,12 +64,24 @@ pub fn parse(raw: &[u8]) -> Result<Email> {
             Some(text) => text.into_owned(),
             None => String::from_utf8_lossy(&part.decoded()).into_owned(),
         };
-        // If there are several calendar parts, the last one wins.
-        email.event = Some(
-            ical::parse_ical_data(&text)
-                .context("extracting calendar info")
-                .context("extracting calendar data")?,
-        );
+        // Mails often carry the same calendar twice, as text/calendar and as
+        // an attachment. The last copy that can be parsed wins; a broken copy
+        // only matters if no copy can be parsed (tests 21 and 22).
+        match ical::parse_ical_data(&text) {
+            Ok(event) => email.event = Some(event),
+            Err(error) => {
+                let content_type = part
+                    .content_type()
+                    .map(|c| format!("{}/{}", c.ctype(), c.subtype().unwrap_or_default()))
+                    .unwrap_or_else(|| "unknown".to_string());
+                first_error.get_or_insert(Error::new(format!(
+                    "extracting calendar data: in {content_type} part: {error}"
+                )));
+            }
+        }
+    }
+    if let (None, Some(error)) = (&email.event, first_error) {
+        return Err(error);
     }
 
     Ok(email)
@@ -112,6 +131,42 @@ mod tests {
     fn broken_calendar_is_an_error() {
         let error = parse(&read("test-12.eml")).unwrap_err().to_string();
         assert!(error.contains("extracting calendar data"), "{error}");
+    }
+
+    fn calendar(uid: &str) -> String {
+        format!(
+            "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Test//EN\r\nBEGIN:VEVENT\r\nUID:{uid}\r\nDTSTAMP:20250101T000000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+        )
+    }
+
+    #[test]
+    fn calendar_parameters_on_a_multipart_do_not_make_it_a_calendar() {
+        // OpenProject (test 20): the container itself is named like an .ics file.
+        let mail = format!(
+            "From: a@example.com\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"b\"; charset=UTF-8; method=PUBLISH; name=meeting.ics\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nHello\r\n--b\r\nContent-Type: text/calendar; charset=UTF-8\r\n\r\n{}--b--\r\n",
+            calendar("in-part")
+        );
+        let event = parse(mail.as_bytes()).unwrap().event.unwrap();
+        assert_eq!(event.uid, "in-part");
+    }
+
+    #[test]
+    fn a_broken_calendar_copy_is_skipped_if_another_copy_is_valid() {
+        let broken = calendar("copy").replace("UID:copy", "UID;broken");
+        for (first, second) in [(&broken, &calendar("copy")), (&calendar("copy"), &broken)] {
+            let mail = format!(
+                "From: a@example.com\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/calendar\r\n\r\n{first}--b\r\nContent-Type: application/ics; name=\"invite.ics\"\r\n\r\n{second}--b--\r\n"
+            );
+            let event = parse(mail.as_bytes()).unwrap().event.unwrap();
+            assert_eq!(event.uid, "copy");
+        }
+
+        // If every copy is broken, the error names the part.
+        let mail = format!(
+            "From: a@example.com\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"b\"\r\n\r\n--b\r\nContent-Type: text/calendar\r\n\r\n{broken}--b--\r\n"
+        );
+        let error = parse(mail.as_bytes()).unwrap_err().to_string();
+        assert!(error.contains("in text/calendar part"), "{error}");
     }
 
     #[test]

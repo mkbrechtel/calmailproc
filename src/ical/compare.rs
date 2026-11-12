@@ -2,7 +2,7 @@
 
 use chrono::NaiveDateTime;
 
-use super::{Event, decode};
+use super::{Component, Event, decode};
 use crate::error::{Context, Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -15,17 +15,46 @@ pub enum Comparison {
 /// Compares two events: the higher SEQUENCE wins; with equal sequences the
 /// later DTSTAMP wins. An event without a usable DTSTAMP loses.
 pub fn compare_events(first: &Event, second: &Event) -> Result<Comparison> {
-    if first.sequence > second.sequence {
+    compare(
+        first.sequence,
+        extract_dtstamp(&first.raw_data),
+        second.sequence,
+        extract_dtstamp(&second.raw_data),
+    )
+}
+
+/// Compares two versions of one component (two parent events, or two updates
+/// of the same occurrence) by the same rules as [`compare_events`].
+pub fn compare_components(first: &Component, second: &Component) -> Result<Comparison> {
+    compare(
+        sequence(first),
+        dtstamp(first),
+        sequence(second),
+        dtstamp(second),
+    )
+}
+
+/// The SEQUENCE of a component; 0 if it has none or it is not a number.
+pub fn sequence(component: &Component) -> i64 {
+    component
+        .value("SEQUENCE")
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+fn compare(
+    first_sequence: i64,
+    first_stamp: Result<NaiveDateTime>,
+    second_sequence: i64,
+    second_stamp: Result<NaiveDateTime>,
+) -> Result<Comparison> {
+    if first_sequence > second_sequence {
         return Ok(Comparison::FirstNewer);
     }
-    if first.sequence < second.sequence {
+    if first_sequence < second_sequence {
         return Ok(Comparison::SecondNewer);
     }
-
-    match (
-        extract_dtstamp(&first.raw_data),
-        extract_dtstamp(&second.raw_data),
-    ) {
+    match (first_stamp, second_stamp) {
         (Err(e1), Err(e2)) => Err(Error::new(format!(
             "failed to extract DTSTAMP from both events: {e1}, {e2}"
         ))),
@@ -44,7 +73,11 @@ fn extract_dtstamp(ics: &str) -> Result<NaiveDateTime> {
         .events()
         .next()
         .ok_or_else(|| Error::new("no VEVENT component found"))?;
-    let dtstamp = vevent
+    dtstamp(vevent)
+}
+
+fn dtstamp(component: &Component) -> Result<NaiveDateTime> {
+    let dtstamp = component
         .value("DTSTAMP")
         .ok_or_else(|| Error::new("VEVENT missing DTSTAMP property"))?;
     parse_ical_time(dtstamp)
@@ -132,6 +165,34 @@ mod tests {
         for (name, first, second, expected) in cases {
             assert_eq!(compare_events(&first, &second).unwrap(), expected, "{name}");
         }
+    }
+
+    #[test]
+    fn compare_two_versions_of_a_component() {
+        let component = |sequence: &str, dtstamp: &str| {
+            let mut component = Component::new("VEVENT");
+            component.set_prop("SEQUENCE", sequence);
+            component.set_prop("DTSTAMP", dtstamp);
+            component
+        };
+        let compare = |a: &Component, b: &Component| compare_components(a, b).unwrap();
+        assert_eq!(
+            compare(&component("2", EARLY), &component("1", LATE)),
+            Comparison::FirstNewer
+        );
+        assert_eq!(
+            compare(&component("1", EARLY), &component("1", LATE)),
+            Comparison::SecondNewer
+        );
+        assert_eq!(
+            compare(&component("1", LATE), &component("1", LATE)),
+            Comparison::Equal
+        );
+        assert_eq!(
+            compare(&component("x", LATE), &component("0", EARLY)),
+            Comparison::FirstNewer
+        );
+        assert_eq!(sequence(&Component::new("VEVENT")), 0);
     }
 
     #[test]

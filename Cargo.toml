@@ -15,3 +15,5 @@ serde = { version = "1", features = ["derive"] }
 serde-saphyr = { version = "2.1", default-features = false, features = ["deserialize"] }
 base64 = "0.23"
 chrono = { version = "0.4.45", default-features = false, features = ["now"] }
+roxmltree = "0.21.2"
+percent-encoding = "2.3.2"

@@ -17,22 +17,8 @@ use calmailproc::ical;
 const AUTHORIZATION: &str = "Basic dGVzdDpwYXNz";
 const CALENDAR: &str = "/user/calendars/calendar1/";
 
-/// Mails the binary rejects with an error.
-const REJECTED: [&str; 9] = [
-    // Invalid calendar data that must be rejected.
-    "test-12.eml",
-    "test-13.eml",
-    "test-14.eml",
-    "test-15.eml",
-    // Known bugs: these should be accepted. Each has a failing test in
-    // tests/processor.rs (test_19 to test_23); remove the mail from this
-    // list when its bug is fixed.
-    "test-19.eml",
-    "test-20.eml",
-    "test-21.eml",
-    "test-22.eml",
-    "test-23.eml",
-];
+/// Mails with invalid calendar data, which the binary rejects with an error.
+const REJECTED: [&str; 4] = ["test-12.eml", "test-13.eml", "test-14.eml", "test-15.eml"];
 
 type Store = Arc<Mutex<BTreeMap<String, String>>>;
 
@@ -77,6 +63,14 @@ impl FakeCalDav {
     }
 }
 
+/// A stable ETag for some content.
+fn etag(content: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    content.hash(&mut hasher);
+    format!("\"{:x}\"", hasher.finish())
+}
+
 fn handle(stream: TcpStream, store: &Store) -> std::io::Result<()> {
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut request_line = String::new();
@@ -86,6 +80,8 @@ fn handle(stream: TcpStream, store: &Store) -> std::io::Result<()> {
 
     let mut content_length = 0;
     let mut authorized = false;
+    let mut if_match = None;
+    let mut if_none_match = None;
     loop {
         let mut line = String::new();
         reader.read_line(&mut line)?;
@@ -94,39 +90,94 @@ fn handle(stream: TcpStream, store: &Store) -> std::io::Result<()> {
             break;
         }
         if let Some((name, value)) = line.split_once(':') {
+            let value = value.trim().to_string();
             match name.to_ascii_lowercase().as_str() {
-                "content-length" => content_length = value.trim().parse().unwrap_or(0),
-                "authorization" => authorized = value.trim() == AUTHORIZATION,
+                "content-length" => content_length = value.parse().unwrap_or(0),
+                "authorization" => authorized = value == AUTHORIZATION,
+                "if-match" => if_match = Some(value),
+                "if-none-match" => if_none_match = Some(value),
                 _ => {}
             }
         }
     }
     let mut body = vec![0; content_length];
     reader.read_exact(&mut body)?;
+    let body = String::from_utf8_lossy(&body).into_owned();
 
-    let (status, response_body) = if !authorized {
-        ("401 Unauthorized", String::new())
+    let mut store = store.lock().unwrap();
+    let current = store.get(path).cloned();
+    // The conditions a CalDAV server checks before changing a resource.
+    let precondition_failed = match (&if_match, &if_none_match, &current) {
+        (Some(expected), _, Some(current)) => *expected != etag(current),
+        (Some(_), _, None) => true,
+        (None, Some(_), Some(_)) => true,
+        _ => false,
+    };
+
+    let (status, headers, response_body) = if !authorized {
+        (
+            "401 Unauthorized",
+            String::new(),
+            "wrong credentials".to_string(),
+        )
     } else {
-        let mut store = store.lock().unwrap();
         match method {
-            "PUT" => {
-                store.insert(
-                    path.to_string(),
-                    String::from_utf8_lossy(&body).into_owned(),
-                );
-                ("201 Created", String::new())
+            "PUT" | "DELETE" if precondition_failed => {
+                ("412 Precondition Failed", String::new(), String::new())
             }
-            "GET" => match store.get(path) {
-                Some(ics) => ("200 OK", ics.clone()),
-                None => ("404 Not Found", String::new()),
+            "PUT" => {
+                let headers = format!("ETag: {}\r\n", etag(&body));
+                store.insert(path.to_string(), body);
+                ("201 Created", headers, String::new())
+            }
+            "DELETE" => match store.remove(path) {
+                Some(_) => ("204 No Content", String::new(), String::new()),
+                None => ("404 Not Found", String::new(), String::new()),
             },
-            _ => ("405 Method Not Allowed", String::new()),
+            "GET" => match current {
+                Some(ics) => ("200 OK", format!("ETag: {}\r\n", etag(&ics)), ics),
+                None => ("404 Not Found", String::new(), String::new()),
+            },
+            // calendar-query for a UID: every resource under the path whose
+            // data contains the UID (a substring match, like a real server).
+            "REPORT" => {
+                let uid = body
+                    .split("<C:text-match collation=\"i;octet\">")
+                    .nth(1)
+                    .and_then(|rest| rest.split("</C:text-match>").next())
+                    .unwrap_or_default()
+                    .replace("&amp;", "&");
+                let responses: String = store
+                    .iter()
+                    .filter(|(resource, ics)| {
+                        // Long lines are folded; match on the unfolded text.
+                        let unfolded = ics.replace("\r\n ", "").replace("\n ", "");
+                        resource.starts_with(path) && unfolded.contains(&uid)
+                    })
+                    .map(|(resource, ics)| {
+                        format!(
+                            "<d:response><d:href>{resource}</d:href><d:propstat><d:prop><d:getetag>{}</d:getetag><c:calendar-data>{}</c:calendar-data></d:prop></d:propstat></d:response>",
+                            etag(ics).replace('"', "&quot;"),
+                            ics.replace('&', "&amp;").replace('<', "&lt;")
+                        )
+                    })
+                    .collect();
+                (
+                    "207 Multi-Status",
+                    String::new(),
+                    format!(
+                        "<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\">{responses}</d:multistatus>"
+                    ),
+                )
+            }
+            _ => ("405 Method Not Allowed", String::new(), String::new()),
         }
     };
+    drop(store);
     let mut stream = stream;
     write!(
         stream,
-        "HTTP/1.1 {status}\r\nContent-Type: text/calendar\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response_body}",
+        "HTTP/1.1 {status}\r\n{headers}Content-Type: text/calendar\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response_body}",
         response_body.len()
     )
 }
@@ -210,7 +261,7 @@ fn stdin_maildir_and_config_file_modes_store_the_same_events() {
     let stdin_server = FakeCalDav::start();
     run_stdin_mode(&stdin_server, &empty_config);
     let stdin_events = stdin_server.events();
-    assert_eq!(stdin_events.len(), 14);
+    assert_eq!(stdin_events.len(), 19);
 
     // Mode 2: the whole maildir in one run.
     let maildir_server = FakeCalDav::start();
@@ -278,6 +329,12 @@ fn stdin_maildir_and_config_file_modes_store_the_same_events() {
     // Test 07: updates arrive as sequence 0, 3, 4, 2, 1. The server must keep 4,
     // which only works if the stored sequence is read back correctly.
     assert_eq!(sequence_of("FD5688352A1F9347AAD14BB6A7C46727"), 4);
+    // Test 19: a UID with a space becomes a percent-encoded resource name.
+    assert!(
+        stdin_events.keys().any(|path| path.contains("%20")),
+        "{:?}",
+        stdin_events.keys()
+    );
     // Tests 05 and 06: replies update the invitation instead of replacing it.
     let (_, test_5) = stdin_events
         .iter()
@@ -288,6 +345,54 @@ fn stdin_maildir_and_config_file_modes_store_the_same_events() {
 
     let _ = std::fs::remove_dir_all(empty_config);
     let _ = std::fs::remove_dir_all(with_config);
+}
+
+#[test]
+fn event_stored_under_another_name_is_updated_in_place() {
+    // An event that a calendar client or the server put into the calendar
+    // does not have to be named after its UID.
+    let server = FakeCalDav::start();
+    let config = config_home("other-name");
+    let other_name = format!("{CALENDAR}client-chosen-name.ics");
+    let invitation =
+        calmailproc::email::parse(&std::fs::read("test/maildir/cur/test-01-1.eml").unwrap())
+            .unwrap()
+            .event
+            .unwrap();
+    server
+        .store
+        .lock()
+        .unwrap()
+        .insert(other_name.clone(), invitation.raw_data.clone());
+
+    // The cancellation for that event.
+    let cancellation = std::fs::read("test/maildir/cur/test-01-2.eml").unwrap();
+    let output = run(&server.args(), Some(&cancellation), &config);
+    assert_eq!(output.status.code(), Some(0), "{}", text(&output.stderr));
+    assert!(
+        text(&output.stdout).starts_with("Updated event with UID "),
+        "{} {}",
+        text(&output.stdout),
+        text(&output.stderr)
+    );
+
+    let events = server.events();
+    assert_eq!(
+        events.keys().collect::<Vec<_>>(),
+        [&other_name],
+        "updated where it was found, no second resource"
+    );
+    let stored = ical::decode(&events[&other_name]).unwrap();
+    let vevent = stored.events().next().unwrap();
+    assert_eq!(vevent.value("STATUS"), Some("CANCELLED"));
+    // The event was on the server without SCHEDULE-AGENT and stays that way.
+    assert!(
+        vevent
+            .properties
+            .iter()
+            .all(|p| p.param("SCHEDULE-AGENT").is_none())
+    );
+    let _ = std::fs::remove_dir_all(config);
 }
 
 #[test]
@@ -303,7 +408,11 @@ fn wrong_password_is_an_error() {
     assert_eq!(output.status.code(), Some(1));
     let stderr = text(&output.stderr);
     assert!(stderr.contains("looking up existing event"), "{stderr}");
-    assert!(stderr.contains("401"), "{stderr}");
+    // The status and the server's own explanation.
+    assert!(
+        stderr.contains("HTTP status 401: wrong credentials"),
+        "{stderr}"
+    );
     assert!(server.events().is_empty());
     let _ = std::fs::remove_dir_all(config);
 }
