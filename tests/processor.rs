@@ -966,3 +966,19 @@ fn test_22_empty_line_in_folded_description() {
     assert_eq!(parents(&event).len(), 1);
     assert_eq!(occurrences(&event).len(), 1);
 }
+
+#[test]
+fn test_23_instance_without_dtstamp() {
+    let mut processor = processor(true);
+    process(&mut processor, "test-23.eml");
+    let event = only_event(&processor);
+    assert_eq!(
+        event.uid,
+        "966789746014E84833N6V8576A38Y8670372498011885OY125G9FN36460763984607957743334999GRUX1I0A9EI98438S4Z56BF4XG41C2HX"
+    );
+    assert_eq!(parents(&event).len(), 1);
+    assert_eq!(occurrences(&event).len(), 1);
+    for vevent in calendar(&event).events() {
+        assert_eq!(vevent.props("DTSTAMP").count(), 1, "every VEVENT needs one DTSTAMP");
+    }
+}
