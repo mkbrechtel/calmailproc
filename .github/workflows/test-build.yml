@@ -10,29 +10,23 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        go-version: [ '1.22', '1.23', '1.24' ]
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
 
-      - name: Get dependencies
-        run: go mod download
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Run linting
+        run: cargo clippy --all-targets --locked -- -D warnings
 
       - name: Run tests
-        run: go test -v ./...
-        
-      - name: Run linting
-        uses: golangci/golangci-lint-action@v3
-        with:
-          version: latest
+        run: cargo test --locked
 
   build:
     name: Build
@@ -42,16 +36,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
 
       - name: Build
-        run: go build -v .
+        run: cargo build --release --locked
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: calmailproc
-          path: calmailproc
+          path: target/release/calmailproc

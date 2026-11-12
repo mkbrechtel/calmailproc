@@ -7,10 +7,10 @@ Test 12 tests handling of invalid calendar data that should cause an error.
 This test email should be rejected with an error message. We expect an error message like this:
 
 ```
-Error: error processing stdin: processing stdin: parsing email: processing multipart: extracting calendar data: extracting calendar info: parsing iCal data: panic in decoder: runtime error: index out of range [0] with length 0
+Error: error processing stdin: processing stdin: parsing email: extracting calendar data: extracting calendar info: parsing iCal data: decoding iCal data: malformed content line without ':': ORGANIZER;CN=Sixt SE
 ```
 
-The specific error appears to be caused by a panic in the iCal decoder, indicating an index out of range error. This tests the processor's ability to gracefully handle malformed iCalendar data without crashing the entire application.
+The calendar attachment contains the content line `ORGANIZER;CN=Sixt SE`, which has no `:` and no value. The calendar is rejected before it is parsed. This tests the processor's ability to handle malformed iCalendar data gracefully.
 
 When processing this email, the calendar processor should:
 1. Attempt to parse the iCalendar data

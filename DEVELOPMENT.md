@@ -1,519 +1,146 @@
 # calmailproc - Development Guide
 
 ## Overview
-calmailproc is a Go application that processes emails containing calendar data (iCalendar/ICS), extracts calendar events, and stores them in a structured format. It provides a clean, modular design with clear separation of concerns.
-
-## Core Components and Responsibilities
-
-### 1. Parser Modules 
-
-The parser functionality is split into two modules with distinct responsibilities:
-
-#### 1.1 Email Parser (`/parser/email`)
-**Primary responsibility**: Parse email content without calendar-specific interpretation.
-
-- **Input**: Raw email content (RFC822 format)
-- **Output**: Email metadata with calendar event data if present
-- **Constraints**:
-  - Must extract email fields (subject, from, to, date)
-  - Must detect presence of calendar attachments
-  - Must handle common email encodings (base64, quoted-printable)
-  - Must delegate calendar parsing to the ical module
-
-#### 1.2 iCalendar Parser (`/parser/ical`)
-**Primary responsibility**: Parse and provide access to calendar data.
-
-- **Input**: Raw iCalendar data (from email attachments)
-- **Output**: Structured calendar event data (`ical.Event`)
-- **Key Files**:
-  - `ical.go`: Core parsing functions (`ParseICalData`, `DecodeCalendar`, `EncodeCalendar`)
-  - `event.go`: Event struct and methods (e.g., `IsRecurringUpdate()`)
-  - `compare.go`: Event comparison logic based on sequence numbers and DTSTAMP
-  - `validate.go`: UID and event validation functions
-- **Constraints**:
-  - Must extract essential calendar fields (UID, summary, sequence number, method)
-  - Must preserve original calendar data (RawData) for storage modules
-  - Must centralize all iCalendar parsing functionality
-  - Includes panic recovery for malformed iCalendar data
-  - Provides helper functions for calendar manipulation
-
-### 2. Storage Module (`/storage`)
-
-**Primary responsibility**: Provide a consistent interface for storing and retrieving calendar events.
-
-- **Interface**:
-  - `StoreEvent(event *ical.Event) error`
-  - `GetEvent(id string) (*ical.Event, error)`
-  - `ListEvents() ([]*ical.Event, error)`
-  - `DeleteEvent(id string) error`
-
-- **Key implementations**:
-  - **CalDAV storage** (`caldav.go`): CalDAV server implementation using go-webdav
-  - **Memory storage** (`memory.go`): In-memory implementation for testing
-
-- **Key Files**:
-  - `storage.go`: Storage interface definition
-  - `caldav.go`: CalDAV client implementation with CRUD operations
-  - `memory.go`: Simple in-memory storage with mutex-protected map
-
-- **Constraints**:
-  - Must handle iCalendar format correctly without corrupting data
-  - Must use UID as the primary identifier for events
-  - Storage implementations do NOT check sequence numbers (this is done by processor)
-  - CalDAV implementation uses event path format: `{calendarPath}/{UID}.ics`
-
-### 3. Processor Module (`/processor`)
-
-**Primary responsibility**: Orchestrate flow between parser and storage, applying business logic for calendar events.
-
-**Note**: The Calendar Manager module mentioned in earlier documentation does not exist as a separate module. All calendar manipulation logic is currently implemented directly in the Processor module.
-
-- **Main File**: `processor.go` - Contains core processing logic
-- **Core functions**:
-  - Determine whether events should be stored or ignored
-  - Handle event updates using sequence number comparison and DTSTAMP
-  - Apply business rules for METHOD attributes (REQUEST, CANCEL, REPLY)
-  - Handle recurring event instances (RECURRENCE-ID)
-  - Update attendee status based on REPLY methods
-  - Prepare events for storage (remove METHOD property)
-  - Validate events before storage
-
-- **Key Methods**:
-  - `ProcessEmail(r io.Reader)` - Main entry point for email processing
-  - `processEvent()` - Handle general event processing
-  - `processEventRequest()` - Handle METHOD:REQUEST
-  - `processEventCancelation()` - Handle METHOD:CANCEL
-  - `processEventReply()` - Handle METHOD:REPLY (if enabled)
-  - `handleRecurringEvent()` - Merge recurring event updates with existing events
-  - `handleParentEventUpdate()` - Update parent event while preserving instances
-  - `updateAttendeeStatus()` - Update attendee participation status
-  - `prepareEventForStorage()` - Remove METHOD property before storage
-
-- **Constraints**:
-  - Uses `ical.CompareEvents()` for determining event precedence
-  - Validates UIDs and events before processing
-  - Returns (string, error) tuples for status reporting
-  - Does not directly parse calendar data (delegates to parser/ical)
-
-### Processor Sub-modules
-
-The processor module is divided into specialized sub-modules for each operation mode:
-
-#### 3.1 Stdin Processor (`/processor/stdin`)
-
-**Primary responsibility**: Process single emails from stdin with immediate feedback.
-
-- **Key Functions**:
-  - `Process(proc *processor.Processor)` - Process email from os.Stdin
-  - `ProcessReader(r io.Reader, proc *processor.Processor)` - Process from any reader (useful for testing)
-
-- **Core functions**:
-  - Stream processing with minimal memory usage
-  - Immediate output formatting to stdout
-  - Error handling with appropriate exit codes
-
-#### 3.2 Maildir Processor (`/processor/maildir`)
-
-**Primary responsibility**: Batch process multiple emails from maildir structure.
-
-- **Key Functions**:
-  - `Process(maildirPath, proc, verbose)` - Main entry point for maildir processing
-  - `ProcessWithConfig(config, proc)` - Process using configuration struct
-  - `processMaildirDirectory()` - Recursively process maildir and subdirectories
-  - `processStandardMaildirFolders()` - Process `new/` and `cur/` folders
-  - `processEmailsInDirectory()` - Process all emails in a directory
-  - `processEmailFile()` - Process a single email file
-  - `processSubdirectories()` - Recursively process maildir subfolders
-
-- **Core functions**:
-  - Efficiently iterate through maildir hierarchies (recursive)
-  - Process both standard maildir folders (`new/`, `cur/`) and subdirectories
-  - Generate output for each processed email
-  - Skip non-email files (`.DS_Store`, `maildirfolder`, etc.)
-  - Optional verbose logging to stderr
-  - Continue processing on individual email failures
-
-### 4. CLI Module (`/cli`)
-
-**Primary responsibility**: Handle user input, configure components, and set up the processing pipeline.
-
-- **Key Types**:
-  - `Config` - Main configuration struct containing all settings
-  - `StdinConfig` - Configuration for stdin mode
-  - `WebdavConfig` - CalDAV server configuration
-  - `ProcessorConfig` - Processor-specific settings
-  - `MaildirConfig` - Maildir-specific settings
-
-- **Key Functions**:
-  - `ParseFlags()` - Parse command-line flags and load config file
-  - `loadConfigFile()` - Load YAML configuration from XDG config directory
-  - `Run(config)` - Main execution function
-
-- **Configuration Sources** (in order of precedence):
-  1. Command-line flags (highest priority)
-  2. YAML config file at `~/.config/calmailproc/config.yaml` (via XDG)
-  3. Default values (lowest priority)
-
-- **Functions**:
-  - Parse command-line arguments with flag package
-  - Load XDG-based YAML configuration file
-  - Initialize CalDAV storage backend
-  - Create processor with appropriate configuration
-  - Route to stdin or maildir mode based on flags
-
-## Data Flow
-
-1. **CLI Layer**: Parse flags, load config, initialize storage and processor
-2. **Input Layer**: Email is read from stdin or maildir (via stdin/maildir sub-modules)
-3. **Email Parser** (`parser/email`): Extract email metadata and identify calendar attachments
-4. **iCalendar Parser** (`parser/ical`): Parse calendar data into `ical.Event` struct
-5. **Processor** (`processor`):
-   - Validate UID and event data
-   - Compare with existing events using sequence numbers and DTSTAMP
-   - Handle METHOD-specific logic (REQUEST, CANCEL, REPLY)
-   - Merge recurring event instances or update parent events
-   - Update attendee status for REPLY methods
-   - Prepare event for storage (remove METHOD property)
-6. **Storage Layer**: Store event to CalDAV server or memory
-7. **Output Layer**: Return status message to stdin/maildir processors for display
-
-## Key Design Principles
-
-1. **Clear separation of concerns**:
-   - Email Parser: Extract email data only
-   - iCalendar Parser: Parse calendar data, provide comparison and validation utilities
-   - Processor: Orchestrate flow, apply business logic, handle calendar manipulations
-   - Storage: Store/retrieve data (no business logic)
-   - CLI: Configuration and routing
-
-2. **Error handling**:
-   - Each layer should handle its own errors
-   - Don't throw exceptions or panic (except in catastrophic cases)
-   - Return errors up the call stack with context
-   - Fail gracefully where possible
-
-3. **Data preservation with targeted manipulation**:
-   - Email parser produces email data without calendar interpretation
-   - iCalendar parser extracts calendar data, preserving RawData for storage
-   - Processor handles necessary calendar manipulations (merging recurring events, updating attendees)
-   - Storage persists data without modification
-   - METHOD property is removed before storage (per iCalendar spec)
-
-4. **Simplicity over complexity**:
-   - Prefer clear, simple code over clever optimizations
-   - Each function should do one thing well
-   - Avoid special cases and excessive error handling
-   - Use the standard library where possible
-
-## Architecture Notes
-
-The current architecture is the result of iterative refinement:
-
-1. **Parser modules** are cleanly separated between email and calendar concerns
-2. **Storage layer** is simple and focused - just CRUD operations, no business logic
-3. **Processor** handles all business logic and calendar manipulations - this centralization is intentional
-4. **Calendar Manager module** was considered but removed as architecture bloat - the processor handles these concerns adequately
-
-The decision tree in the processor exists for good reasons - different calendar methods (REQUEST, CANCEL, REPLY) and scenarios (new events, updates, recurring instances) require different handling logic.
-
-## Calendar Event Handling
-
-The application handles various types of calendar events according to the iCalendar specification (RFC 5545). Here's how each type should be handled:
-
-### Event Types and Methods
-
-1. **REQUEST (New Event or Update)**
-   - Email Parser: Detect email with calendar attachment
-   - iCal Parser: Extract UID, sequence number, method, and raw data
-   - Processor: Check for existing event with same UID
-   - Processor: Compare using sequence numbers and DTSTAMP
-   - Processor: Store as new event if UID not found
-   - Processor: Update existing event if new event is newer or equal
-
-2. **CANCEL (Event Cancellation)**
-   - Email Parser: Detect email with calendar attachment
-   - iCal Parser: Extract UID, sequence number, and method (CANCEL)
-   - Processor: Check for existing event with same UID
-   - Processor: Compare using sequence numbers and DTSTAMP
-   - Processor: Update event status to CANCELLED if appropriate
-   - Processor: Skip if existing sequence number is higher
-
-3. **REPLY (Attendance Response)**
-   - Email Parser: Detect email with calendar attachment
-   - iCal Parser: Extract UID, method (REPLY), and raw data
-   - Processor: Check if reply processing is enabled (configurable)
-   - Processor: If enabled, retrieve existing event from storage
-   - Processor: Update participant PARTSTAT in event
-   - Processor: Store the updated event
-
-### Recurring Events
-
-Recurring events require special handling:
-
-1. **Master Recurring Event**
-   - Has RRULE property but no RECURRENCE-ID
-   - Processor: Store as normal event
-
-2. **Exception to Recurring Event (Instance Update)**
-   - Has RECURRENCE-ID property (may or may not have RRULE)
-   - Processor: Identify as modification to specific instance using `IsRecurringUpdate()`
-   - Processor: Retrieve existing calendar, merge the instance exception
-   - Processor: Store the updated calendar with exception added
-
-3. **Parent Event Update**
-   - Update to master event when instances already exist
-   - Processor: Update parent event while preserving existing instance exceptions
-   - Processor: Use `handleParentEventUpdate()` to merge changes
-
-4. **Cancellation of Specific Instance**
-   - Has RECURRENCE-ID and METHOD:CANCEL
-   - Processor: Mark specific instance as cancelled without affecting master event
-   - Processor: Add or update instance with STATUS:CANCELLED
-
-### Sequence Numbers and DTSTAMP
-
-Event comparison uses both sequence numbers and DTSTAMP to determine precedence:
-
-1. **Higher Sequence Number**
-   - Newer version of an event
-   - Should replace older versions
-
-2. **Lower Sequence Number**
-   - Older version of an event
-   - Should be ignored if newer version exists
-
-3. **Equal Sequence Number**
-   - Compare DTSTAMP values (more recent wins)
-   - Implementation in `ical.CompareEvents()`
-   - Returns: FirstEventNewer (1), SecondEventNewer (-1), or EventsEqual (0)
-
-## Testing Strategy
-
-1. **Unit tests**:
-   - Email Parser: Test extraction from various email formats
-   - iCal Parser: Test calendar data extraction, comparison, and validation
-   - Processor: Test orchestration, decision making, and calendar manipulations
-   - Storage: Test CRUD operations on calendar data
-
-2. **Integration tests**:
-   - Located in `processor/processor_test_*.go` files (test-00 through test-18)
-   - Test realistic email scenarios with CalDAV storage
-   - Cover: new events, updates, recurring events, replies, cancellations
-   - Test recurring event instances and parent updates
-   - Validate end-to-end flow maintains data integrity
-
-3. **End-to-end testing**:
-   - Script: `test.sh`
-   - Uses Xandikos CalDAV server for testing
-   - Tests both stdin and maildir modes
-   - Validates config file loading
-   - Compares results across different modes
-
-4. **Test data**:
-   - Location: `test/maildir/cur/test-*.eml`
-   - Each test numbered and documented in `test/test$n.md`
-   - Include edge cases and error conditions
-
-## Operation Modes
-
-The application operates in two distinct modes, each with its own workflow and use cases:
-
-### 1. Stdin Mode
-
-In Stdin mode, the application processes a single email message from standard input.
-
-**Workflow:**
-1. Email data is read from stdin
-2. Email parser extracts calendar information
-3. Processor applies business logic and calendar manipulations
-4. Event is stored in the configured CalDAV storage backend
-5. Status message is output to stdout
-
-**Use Cases:**
-- Integration with mail delivery agents (e.g., procmail, sieve)
-- Processing a single email via pipe in shell
-- Testing and debugging individual email handling
-
-**Example:**
-```bash
-cat test/maildir/cur/test-01.eml | ./calmailproc -url http://localhost:5232 -user test -pass pass -calendar /user/calendars/calendar1/
+
+calmailproc is a Rust application that processes emails containing calendar data (iCalendar/ICS), extracts the calendar event and stores it on a CalDAV server. Version 0.2 is a port of the Go version 0.1; the module structure and the status messages were kept.
+
+## Dependencies
+
+Each protocol is handled by one crate; everything else uses the standard library.
+
+| Crate | Used for | Used in |
+|---|---|---|
+| `mail-parser` | Email and MIME parsing, transfer encodings, charsets | `src/email.rs` |
+| `icalendar` | iCalendar parsing and writing | `src/ical/mod.rs` |
+| `ureq` (with `rustls`) | HTTP for CalDAV | `src/storage/caldav.rs` |
+| `base64` | Basic authentication header | `src/storage/caldav.rs` |
+| `serde`, `serde-saphyr` | YAML config file | `src/config.rs` |
+| `chrono` | DTSTAMP parsing and the current time | `src/ical/compare.rs`, `src/processor/mod.rs` |
+
+`base64` and `chrono` are dependencies of `ureq` and `icalendar` anyway. Flag parsing, the XDG config lookup, the error type and the maildir walk are written with the standard library.
+
+## Modules
+
+### Email parser (`src/email.rs`)
+
+Parses a raw email and finds its calendar part.
+
+- `parse(raw) -> Result<Email>`: subject, from, to, date and the `ical::Event` if there is one.
+- A part is a calendar part if its type is `text/calendar`, `application/ics` or `text/x-vcalendar`, or if its file name ends in `.ics`. If there are several, the last one wins.
+- A calendar part that cannot be parsed is an error. A mail without a calendar part is not.
+- Parts of attached messages (`message/rfc822`) are not searched.
+
+### iCalendar (`src/ical/`)
+
+The only module that uses the `icalendar` crate. Everything else works on its owned tree types.
+
+- `mod.rs`: `Component` and `Property` (the calendar tree), `Event` (UID, raw data, summary, method, sequence), `decode`, `encode`, `parse_ical_data`.
+- `validate.rs`: `validate` (how often a property may occur, which components may be nested), `validate_event`, `validate_uid`.
+- `compare.rs`: `compare_events` (SEQUENCE first, then DTSTAMP), `parse_ical_time`.
+
+Three things the `icalendar` crate does not do, handled in `mod.rs`:
+
+1. Its parser accepts a content line without `:` and merges the next line into it. `decode` rejects such input before parsing.
+2. Its parser tree cannot be written back as is, because TEXT values are unescaped and parameter quotes stripped on parsing. `encode` writes every property through `icalendar::Property`, which restores both.
+3. It does not check cardinality. `validate` carries the rules go-ical enforced when encoding; `encode` always validates first.
+
+Written output is semantically equal to the input but not byte-identical: parameters are sorted and quoting/escaping is normalised. Tests must therefore compare parsed calendars, not text.
+
+### Storage (`src/storage/`)
+
+```rust
+pub trait Storage {
+    fn store_event(&mut self, event: &Event) -> Result<()>;
+    fn get_event(&mut self, uid: &str) -> Result<Option<Event>>;
+}
 ```
 
-**Configuration Options:**
-- `-url`: CalDAV server URL
-- `-user`: CalDAV username
-- `-pass`: CalDAV password
-- `-calendar`: CalDAV calendar path
-- `-process-replies`: Process METHOD:REPLY emails (default: false)
+- `caldav.rs`: `CalDavStorage`. An event is the resource `{calendar}/{UID}.ics`; reading is `GET` (404 means no event), writing is `PUT`, both with basic authentication. Summary and sequence of a stored event are parsed from the data the server returns.
+- `memory.rs`: `MemoryStorage` for tests, with `list_events`, `event_count` and `delete_event` in addition.
 
-### 2. Maildir Mode
+Storage has no business logic and does not compare sequence numbers.
 
-In Maildir mode, the application processes multiple emails from a maildir directory structure.
+### Processor (`src/processor/`)
 
-**Workflow:**
-1. Scan the maildir directory for email files
-2. Process each email file through the parser and processor
-3. Store events in the configured CalDAV backend
-4. Output status for each processed email
-5. Recursively process subdirectories
+`mod.rs` holds all business logic. `Processor::process_email(raw)` returns `Result<String, Failure>`: the status message, or a `Failure` with a status message and the technical error.
 
-**Maildir Structure:**
-- `new/`: Directory for new, unread mail
-- `cur/`: Directory for read mail
-- `tmp/`: Directory for temporary mail files
-- Subdirectories are processed recursively
+- `process_event`: new events, updates, cancellations.
+  1. Validate the event.
+  2. No stored event: store it.
+  3. The mail updates a single occurrence (a VEVENT with `RECURRENCE-ID`): merge it with `handle_recurring_event`, whatever the sequence numbers.
+  4. The stored event already has occurrence updates: replace the parent event and keep them (`handle_parent_event_update`), without comparing sequence numbers.
+  5. Otherwise compare with `ical::compare_events`; ignore the mail if the stored event is newer, else replace the parent event.
+- `process_event_reply`: `METHOD:REPLY`, only if reply processing is enabled. `update_attendee_status` sets the replying attendee's `PARTSTAT` in the stored event. Addresses are compared case-insensitively.
+- `prepare_event_for_storage`: removes `METHOD`. Every stored event passes through here.
 
-**Use Cases:**
-- Batch processing of existing email archives
-- Scheduled processing via cron jobs
-- Initial migration of calendar data from email to CalDAV storage
+The two input modes:
 
-**Example:**
-```bash
-./calmailproc -maildir=/var/mail/user/Calendars -url http://localhost:5232 -user test -pass pass -calendar /user/calendars/calendar1/ -verbose
-```
+- `stdin.rs`: `process` reads one email from stdin and prints the status; an error becomes exit code 1.
+- `maildir.rs`: `process` walks `new` and `cur` of a maildir and of all subfolders, in name order. A failing email is a warning on stderr; the run continues.
 
-**Configuration Options:**
-- `-maildir`: Path to maildir directory
-- `-url`, `-user`, `-pass`, `-calendar`: CalDAV configuration
-- `-process-replies`: Process METHOD:REPLY emails
-- `-verbose`: Show detailed output for each email
+### CLI and config (`src/cli.rs`, `src/config.rs`)
 
-## Error Handling Strategy
+- `cli::parse_flags` parses Go-style flags (`-url x`, `--url x`, `-url=x`) so that recipes written for 0.1 keep working.
+- `config::load` reads `$XDG_CONFIG_HOME/calmailproc/config.yaml`; a missing file is an empty config, a broken one a warning.
+- `cli::merge` puts flags on top of the config file; `cli::run` requires all four CalDAV settings, then runs maildir mode if a maildir is set and stdin mode otherwise.
 
-Error handling is crucial for a reliable application. Follow these principles:
+### Errors (`src/error.rs`)
 
-### Error Categories
+One `Error` type holding a message. `result.context("parsing email")?` prefixes the cause, giving chains such as `error processing stdin: processing stdin: validation error for event X: encoding calendar: failed to encode VEVENT: want at most one URL property, got 2`. Only `cli::main`, `stdin` and `maildir` print.
 
-1. **Fatal Errors**: Application cannot continue
-   - Configuration errors
-   - Critical resource unavailability (e.g., storage not writable)
-   - Exit with non-zero code and clear error message
+## Data flow
 
-2. **Operational Errors**: Can continue despite issues
-   - Individual email parsing failures
-   - Failed updates due to sequence rules
-   - Log error and continue processing other items
+1. `cli`: parse flags, load config, create storage and processor.
+2. `stdin` or `maildir`: read the raw email.
+3. `email`: parse the mail, find the calendar part.
+4. `ical`: parse the calendar into an `Event`.
+5. `processor`: validate, compare with the stored event, merge, remove `METHOD`.
+6. `storage`: `PUT` the event.
+7. `stdin` or `maildir`: print the status.
 
-3. **Data Validation Errors**: Input data problems
-   - Malformed email format
-   - Missing required calendar fields
-   - Log issue, skip problematic entry, continue processing
+## Differences from the Go version 0.1
 
-### Status and Error Handling Pattern
+Deliberate, each a bug in 0.1:
 
-The application uses a consistent pattern for error handling where processing functions return a pair of values: a descriptive string and an error object. This pattern follows these principles:
+- A reply (`METHOD:REPLY`) now updates the attendee's status. 0.1 compared `MAILTO:` and `mailto:` case-sensitively, did not find the attendee and replaced the stored invitation with the reply.
+- `VTIMEZONE` components survive updates. 0.1 dropped them whenever it replaced a parent event.
+- The CalDAV storage reads summary and sequence from the stored event. 0.1 always assumed sequence 0, so an outdated update could overwrite a newer event.
+- A failed lookup of the stored event (network, authentication) is an error. 0.1 treated it as "no stored event" and stored the mail's event.
+- Quoted-printable calendar parts and charsets are decoded (0.1 only handled base64).
+- `-process-replies=false` and `-verbose=false` override the config file.
 
-1. **Descriptive Status + Error Pattern**: 
-   - All internal processing functions return (string, error) pairs
-   - The string describes what happened (success or failure reason)
-   - The error is non-nil only if a technical error occurred
+## Testing
 
-2. **Output Separation**:
-   - Only the endpoint processors (processor/stdin and processor/maildir) do the actual printing of error status
-   - All other functions just pass a (string, error) pair where the string is the description of what happened to the item
+- `cargo test` runs everything that needs no external server:
+  - unit tests next to the code (`src/**`),
+  - `tests/processor.rs`: the numbered scenarios from `test/test-N.md` with the mails in `test/maildir/cur`, plus synthetic recurring event mails,
+  - `tests/frontends.rs`: stdin and maildir modes,
+  - `tests/end_to_end.rs`: the binary in stdin, maildir and config file mode against a minimal in-process CalDAV stand-in.
+- `./test.sh` runs the same three modes against a real Xandikos server (`xandikos` must be on the `PATH`).
 
-3. **Progressive Error Context**:
-   - Each layer adds context to errors before passing them up
-   - Status strings are human-readable explanations
-   - Errors contain the technical details for debugging
-
-1. **Return Tuples Pattern**: 
-   ```go
-   func ProcessEmail(r io.Reader) (string, error) {
-     // Process the email and return a tuple:
-     // - String describing what happened (for user feedback)
-     // - Error if something went wrong (for logical flow)
-     return "Event stored successfully", nil
-   }
-   ```
-
-2. **Context-Rich Errors**: 
-   ```go
-   if err := parser.Parse(data); err != nil {
-     return "Failed to process event", fmt.Errorf("parsing calendar data: %w", err)
-   }
-   ```
-
-3. **Status Messages with Error Codes**:
-   ```go
-   // For successful operations
-   return fmt.Sprintf("Successfully processed event with UID %s", event.UID), nil
-
-   // For validation issues
-   return fmt.Sprintf("Skipped event with UID %s (sequence too old)", event.UID), nil
-
-   // For actual errors
-   return "Failed to update event", err
-   ```
-
-4. **Error Passthrough**:
-   ```go
-   msg, err := processor.ProcessEvent(event)
-   if err != nil {
-     return fmt.Sprintf("Error in %s: %s", event.UID, msg), err
-   }
-   ```
-
-### Avoiding Error Handling Pitfalls
-
-1. **No Panics**: Never use panic except in truly unrecoverable scenarios
-2. **No Silent Failures**: Always log errors, even if continuing
-3. **No Special Error Types**: Use standard error wrapping/unwrapping
-4. **Clear Error Messages**: Make error messages actionable and clear
-5. **Consistent Return Types**: Don't return nil objects with side effects
-
-## Development Workflow
-
-1. Run tests: `go test ./...`
-2. Build: `go build`
-3. Format code: `go fmt ./...`
-4. Check for race conditions: `go test -race ./...`
-5. Benchmark: `go test -bench=. ./...`
-6. End-to-end testing: `./test.sh`
-
-## Developer Tools
-
-The repository includes several useful developer tools:
-
-### Mail Attachment Decoder
-
-A utility for decoding and viewing email attachments in plain text format. This is particularly useful for examining email structure and calendar invitations.
-
-Location: `utils/maildecoder/`
-
-Usage:
-```bash
-# View email structure and text attachments
-cd utils/maildecoder && go build
-./maildecoder -email=/path/to/email.eml
-
-# Extract all attachments to files
-./maildecoder -email=/path/to/email.eml -extract-all
-```
-
-See `utils/maildecoder/README.md` for more details on usage options.
-
-## Documentation
-
-For better understanding of the libraries used in this project, you can use Go's built-in documentation tool:
+## Development workflow
 
 ```bash
-# View documentation for a specific package
-go doc github.com/emersion/go-ical
-
-# View documentation for a specific function/type
-go doc github.com/emersion/go-ical.Calendar
-
-# View documentation for a standard library package
-go doc fmt
-
-# View documentation for a specific function in the standard library
-go doc fmt.Printf
+cargo test
+cargo fmt
+cargo clippy --all-targets
+./test.sh
 ```
 
-This is especially helpful for understanding the interfaces and functionality provided by third-party libraries like go-ical, as well as standard library packages used throughout the codebase.
+## Developer tools
+
+`examples/maildecoder.rs` shows the structure of an email and decodes its attachments:
+
+```bash
+# Print headers and all text parts, including calendar attachments
+cargo run --example maildecoder -- -email=test/maildir/cur/test-05-2.eml
+
+# Save all parts to files
+cargo run --example maildecoder -- -email=mail.eml -extract-all -out=attachments
+```
+
+Library documentation: `cargo doc --open`.
 
 ## Important notes for AI agents
 
-After making changes, ensure all tests pass and the application runs smoothly.
+After making changes, ensure `cargo test`, `cargo fmt --check` and `cargo clippy --all-targets` pass.

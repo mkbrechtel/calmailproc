@@ -1,9 +1,10 @@
 @README.md
 @DEVELOPMENT.md
-@go.mod
-@main.go
-@cli/cli.go
-@processor/processor.go
+@Cargo.toml
+@src/lib.rs
+@src/cli.rs
+@src/processor/mod.rs
+@src/ical/mod.rs
 @test.sh
 @test/README.md
 @issues/README.md

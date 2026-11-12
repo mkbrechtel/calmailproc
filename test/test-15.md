@@ -7,7 +7,7 @@ Test 15 tests handling of invalid calendar data that has duplicate DTSTAMP prope
 This test email should be rejected with an error message. We expect an error message like this:
 
 ```
-Error: error processing stdin: processing stdin: validation error for event oon6Angumod2xoj5Eashe7lee8xahvai: encoding calendar: encoding calendar: ical: failed to encode "VEVENT": want exactly one "DTSTAMP" property, got 2
+Error: error processing stdin: processing stdin: validation error for event oon6Angumod2xoj5Eashe7lee8xahvai: encoding calendar: failed to encode VEVENT: want exactly one DTSTAMP property, got 2
 ```
 
 The specific error occurs during validation, where the event has duplicate DTSTAMP properties when the iCalendar specification (RFC 5545) requires exactly one DTSTAMP property per event.

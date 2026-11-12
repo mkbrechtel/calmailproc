@@ -52,7 +52,7 @@ scheduling mail for the event that was just processed from a mail.
 ## Proposed Solution
 
 Set the parameter in the one place every stored event passes through:
-`prepareEventForStorage()` in `processor/processor.go`, which already removes
+`prepare_event_for_storage()` in `src/processor/mod.rs`, which already removes
 the `METHOD` property before storage.
 
 - For every `VEVENT` in the calendar, including recurrence instances
@@ -62,7 +62,7 @@ the `METHOD` property before storage.
   `SCHEDULE-AGENT=SERVER` does not survive.
 - Apply it on all paths: new events, updates, cancellations, recurring
   instance merges, parent updates and attendee status updates from
-  `METHOD:REPLY`. All of them already go through `prepareEventForStorage()`.
+  `METHOD:REPLY`. All of them already go through `prepare_event_for_storage()`.
 
 Tests to add:
 
@@ -77,8 +77,7 @@ Tests to add:
 
 - RFC 6638, section 7.1: "Schedule Agent Parameter". Values are `SERVER`
   (default), `CLIENT` and `NONE`.
-- The Rust rewrite (branch `rewrite-in-rust`) must carry this behaviour in its
-  equivalent of `prepareEventForStorage()`.
+- The check belongs in `tests/processor.rs`, on the stored iCalendar data.
 - The end-to-end test in `test.sh` runs a local Xandikos with no mail
   delivery, so it cannot observe the duplicate mail itself. The check has to
   be made on the stored iCalendar data.
