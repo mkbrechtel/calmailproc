@@ -109,7 +109,8 @@ The two input modes:
 
 - `cli::parse_flags` parses Go-style flags (`-url x`, `--url x`, `-url=x`) so that recipes written for 0.1 keep working.
 - `config::load` reads `$XDG_CONFIG_HOME/calmailproc/config.yaml`; a missing file is an empty config, a broken one a warning.
-- `cli::merge` puts flags on top of the config file; `cli::run` requires all four CalDAV settings, then runs maildir mode if a maildir is set and stdin mode otherwise.
+- `cli::merge` puts flags on top of the config file; `cli::run` requires the CalDAV settings, then runs maildir mode if a maildir is set and stdin mode otherwise.
+- `cli::resolve_password` returns `webdav.pass`, or runs `webdav.pass_cmd` with `sh -c` and takes its single line of output (like mbsync's `PassCmd`). The command gets no standard input, because that is where the mail comes from. A password flag replaces the other kind of password setting from the config file.
 
 ### Errors (`src/error.rs`)
 
@@ -142,7 +143,7 @@ Changed behaviour:
 - A reply for an event that is not stored is ignored unless `-process-replies-without-event` is given. 0.1 stored the reply as an event.
 - Events are found by UID under any resource name, written conditionally, and get `SCHEDULE-AGENT=CLIENT` when they are new on the server.
 - `-process-replies=false` and `-verbose=false` override the config file.
-- New options: `-process-replies-without-event`, `-ignore-unknown-cancellations`, `-delete-cancelled`, `-drop-alarms`.
+- New options: `-process-replies-without-event`, `-ignore-unknown-cancellations`, `-delete-cancelled`, `-drop-alarms`, `-pass-cmd`.
 
 ## Testing
 

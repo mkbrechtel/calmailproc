@@ -62,6 +62,7 @@ mod tests {
         assert_eq!(config.webdav.url, "http://localhost:15232");
         assert_eq!(config.webdav.user, "test");
         assert_eq!(config.webdav.pass, "p:a#ss");
+        assert_eq!(config.webdav.pass_cmd, "");
         assert_eq!(config.webdav.calendar, "/user/calendars/calendar3/");
         assert!(config.processor.process_replies);
         assert_eq!(config.maildir.path, "test/maildir");

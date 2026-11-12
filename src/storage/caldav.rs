@@ -28,6 +28,8 @@ pub struct WebdavConfig {
     pub url: String,
     pub user: String,
     pub pass: String,
+    /// A shell command that prints the password, instead of `pass`.
+    pub pass_cmd: String,
     pub calendar: String,
 }
 
@@ -91,6 +93,8 @@ impl Reply {
 }
 
 impl CalDavStorage {
+    /// `config.pass` must hold the password; a `pass_cmd` is resolved by the
+    /// caller (see `cli::resolve_password`).
     pub fn from_config(config: &WebdavConfig) -> Self {
         Self::new(&config.url, &config.user, &config.pass, &config.calendar)
     }

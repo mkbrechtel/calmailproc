@@ -83,6 +83,8 @@ Usage of calmailproc:
         Path to maildir to process (will process all emails recursively)
   -pass string
         CalDAV password
+  -pass-cmd string
+        Shell command that prints the CalDAV password (instead of -pass)
   -process-replies
         Process attendance replies to update events
   -process-replies-without-event
@@ -134,7 +136,28 @@ maildir:
   verbose: false
 ```
 
-All sections and keys are optional. If `maildir.path` is set (or `-maildir` is given), the maildir is processed; otherwise an email is read from stdin. The file contains the password, so make it readable only by you (`chmod 600`).
+All sections and keys are optional. If `maildir.path` is set (or `-maildir` is given), the maildir is processed; otherwise an email is read from stdin.
+
+### Password
+
+The password does not have to be in the config file. With `pass_cmd` in place of `pass`, calmailproc runs a shell command and uses its output as the password, like `PassCmd` in mbsync:
+
+```yaml
+webdav:
+  url: https://caldav.example.com
+  user: alice
+  pass_cmd: pass show calendar/alice
+  calendar: /alice/calendars/invitations/
+```
+
+Other examples are `secret-tool lookup service caldav user alice` or `gpg --quiet --decrypt ~/.config/calmailproc/password.gpg`.
+
+- The command is run by `sh -c` each time calmailproc starts, and must print exactly one line: the password. A trailing line break is removed; nothing else is.
+- If the command fails, prints nothing or prints several lines, calmailproc stops with an error before it contacts the server.
+- The command cannot read standard input, which carries the mail. A command that asks for a passphrase has to use the terminal or an agent; when calmailproc runs unattended from a mail filter there is no terminal, so the secret store must already be unlocked.
+- Use either `pass` or `pass_cmd`, not both. On the command line, `-pass` or `-pass-cmd` replaces whichever of the two the config file has.
+
+If you do put the password into the file as `pass`, make the file readable only by you (`chmod 600`). A password given as `-pass` on the command line is visible to other users of the machine in the process list.
 
 ## How mails are processed
 

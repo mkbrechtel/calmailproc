@@ -396,6 +396,61 @@ fn event_stored_under_another_name_is_updated_in_place() {
 }
 
 #[test]
+#[cfg(unix)]
+fn password_from_a_command() {
+    let server = FakeCalDav::start();
+    let config = config_home("pass-cmd");
+    let mail = std::fs::read("test/maildir/cur/test-01-1.eml").unwrap();
+    let args_with = |pass_cmd: &str| {
+        let mut args = server.args();
+        let pass = args.iter().position(|arg| arg == "-pass").unwrap();
+        args[pass] = "-pass-cmd".to_string();
+        args[pass + 1] = pass_cmd.to_string();
+        args
+    };
+
+    // The command prints the password. It must not swallow the mail, which
+    // arrives on the same standard input: `cat` would, if it could read it.
+    let output = run(
+        &args_with("cat >/dev/null; echo pass"),
+        Some(&mail),
+        &config,
+    );
+    assert_eq!(output.status.code(), Some(0), "{}", text(&output.stderr));
+    assert!(text(&output.stdout).starts_with("Stored new event with UID "));
+    assert_eq!(server.events().len(), 1);
+
+    // From the config file.
+    let other = FakeCalDav::start();
+    std::fs::write(
+        config.join("calmailproc").join("config.yaml"),
+        format!(
+            "webdav:\n  url: {}\n  user: test\n  pass_cmd: \"printf '%s' pa; echo ss\"\n  calendar: {CALENDAR}\n",
+            other.url
+        ),
+    )
+    .unwrap();
+    let output = run(&[], Some(&mail), &config);
+    assert_eq!(output.status.code(), Some(0), "{}", text(&output.stderr));
+    assert_eq!(other.events().len(), 1);
+
+    // A failing command is an error before anything is sent.
+    let output = run(&args_with("echo nope >&2; exit 1"), Some(&mail), &config);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = text(&output.stderr);
+    assert!(
+        stderr.contains("nope"),
+        "the command's own message is shown: {stderr}"
+    );
+    assert!(
+        stderr.contains("Error: the password command failed"),
+        "{stderr}"
+    );
+    assert_eq!(server.events().len(), 1);
+    let _ = std::fs::remove_dir_all(config);
+}
+
+#[test]
 fn wrong_password_is_an_error() {
     let server = FakeCalDav::start();
     let config = config_home("auth");
@@ -440,7 +495,7 @@ fn command_line_errors_and_help() {
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(
         text(&output.stderr).trim(),
-        "Error: all CalDAV flags are required: -url, -user, -pass, -calendar"
+        "Error: all CalDAV flags are required: -url, -user, -pass (or -pass-cmd), -calendar"
     );
 
     // A broken config file is a warning; the flags are still required then.

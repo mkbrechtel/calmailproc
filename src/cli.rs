@@ -4,12 +4,12 @@
 //! the Go `flag` syntax of calmailproc 0.1 (`-url x`, `--url x`, `-url=x`),
 //! so existing mail filter recipes keep working.
 
-use std::process::ExitCode;
+use std::process::{Command, ExitCode, Stdio};
 
 use crate::config::{self, Config};
 use crate::error::{Context, Error, Result};
 use crate::processor::{Processor, maildir, stdin};
-use crate::storage::CalDavStorage;
+use crate::storage::{CalDavStorage, WebdavConfig};
 
 pub const USAGE: &str = "\
 Usage of calmailproc:
@@ -25,6 +25,8 @@ Usage of calmailproc:
         Path to maildir to process (will process all emails recursively)
   -pass string
         CalDAV password
+  -pass-cmd string
+        Shell command that prints the CalDAV password (instead of -pass)
   -process-replies
         Process attendance replies to update events
   -process-replies-without-event
@@ -48,6 +50,7 @@ pub struct Flags {
     pub url: Option<String>,
     pub user: Option<String>,
     pub pass: Option<String>,
+    pub pass_cmd: Option<String>,
     pub calendar: Option<String>,
     pub maildir: Option<String>,
     pub process_replies: Option<bool>,
@@ -100,6 +103,7 @@ pub fn parse_flags(args: impl IntoIterator<Item = String>) -> Result<Flags> {
             "url" => flags.url = string_value(name)?,
             "user" => flags.user = string_value(name)?,
             "pass" => flags.pass = string_value(name)?,
+            "pass-cmd" => flags.pass_cmd = string_value(name)?,
             "calendar" => flags.calendar = string_value(name)?,
             "maildir" => flags.maildir = string_value(name)?,
             "process-replies" => flags.process_replies = bool_value(name)?,
@@ -131,9 +135,19 @@ pub fn merge(mut config: Config, flags: Flags) -> Config {
             *target = value;
         }
     };
+    // A password source given as a flag replaces whichever one the config
+    // file has, so `-pass` overrides `pass_cmd` and `-pass-cmd` overrides `pass`.
+    let given = |flag: &Option<String>| flag.as_deref().is_some_and(|value| !value.is_empty());
+    if given(&flags.pass) && !given(&flags.pass_cmd) {
+        config.webdav.pass_cmd.clear();
+    }
+    if given(&flags.pass_cmd) && !given(&flags.pass) {
+        config.webdav.pass.clear();
+    }
     set(&mut config.webdav.url, flags.url);
     set(&mut config.webdav.user, flags.user);
     set(&mut config.webdav.pass, flags.pass);
+    set(&mut config.webdav.pass_cmd, flags.pass_cmd);
     set(&mut config.webdav.calendar, flags.calendar);
     set(&mut config.maildir.path, flags.maildir);
     let processor = &mut config.processor;
@@ -161,16 +175,21 @@ pub fn merge(mut config: Config, flags: Flags) -> Config {
 /// Processes the maildir if one is configured, standard input otherwise.
 pub fn run(config: &Config) -> Result<()> {
     let webdav = &config.webdav;
-    if [&webdav.url, &webdav.user, &webdav.pass, &webdav.calendar]
+    if [&webdav.url, &webdav.user, &webdav.calendar]
         .iter()
         .any(|value| value.is_empty())
+        || (webdav.pass.is_empty() && webdav.pass_cmd.is_empty())
     {
         return Err(Error::new(
-            "all CalDAV flags are required: -url, -user, -pass, -calendar",
+            "all CalDAV flags are required: -url, -user, -pass (or -pass-cmd), -calendar",
         ));
     }
 
-    let storage = CalDavStorage::from_config(webdav);
+    let webdav = WebdavConfig {
+        pass: resolve_password(webdav)?,
+        ..webdav.clone()
+    };
+    let storage = CalDavStorage::from_config(&webdav);
     let mut processor = Processor::from_config(storage, &config.processor);
 
     if !config.maildir.path.is_empty() {
@@ -178,6 +197,58 @@ pub fn run(config: &Config) -> Result<()> {
             .context("error processing maildir");
     }
     stdin::process(&mut processor).context("error processing stdin")
+}
+
+/// The password: `pass`, or the output of `pass_cmd`.
+///
+/// `pass_cmd` works like mbsync's `PassCmd`: the command is run by the shell
+/// and must print exactly one line, the password. This keeps the password out
+/// of the config file, for example with `pass show ...` or `secret-tool`.
+pub fn resolve_password(webdav: &WebdavConfig) -> Result<String> {
+    if webdav.pass_cmd.is_empty() {
+        return Ok(webdav.pass.clone());
+    }
+    if !webdav.pass.is_empty() {
+        return Err(Error::new(
+            "both a password and a password command are set; use only one of pass and pass_cmd",
+        ));
+    }
+
+    let (shell, flag) = if cfg!(windows) {
+        ("cmd", "/C")
+    } else {
+        ("sh", "-c")
+    };
+    let output = Command::new(shell)
+        .arg(flag)
+        .arg(&webdav.pass_cmd)
+        // Standard input carries the mail in stdin mode; the command must not
+        // read it. A password prompt uses the terminal, not standard input.
+        .stdin(Stdio::null())
+        .stderr(Stdio::inherit())
+        .output()
+        .context("running the password command")?;
+    if !output.status.success() {
+        return Err(Error::new(format!(
+            "the password command failed ({})",
+            output.status
+        )));
+    }
+    let text = String::from_utf8(output.stdout)
+        .map_err(|_| Error::new("the password command printed something that is not UTF-8"))?;
+    let password = text
+        .strip_suffix('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line))
+        .unwrap_or(&text);
+    if password.is_empty() {
+        return Err(Error::new("the password command printed nothing"));
+    }
+    if password.contains('\n') {
+        return Err(Error::new(
+            "the password command printed more than one line; it must print only the password",
+        ));
+    }
+    Ok(password.to_string())
 }
 
 /// The whole program: parse flags, load the config, run.
@@ -306,6 +377,86 @@ mod tests {
         assert_eq!(merged.maildir.path, "/mail");
         assert!(merged.processor.process_replies);
         assert!(!merged.maildir.verbose);
+    }
+
+    fn with_pass_cmd(command: &str) -> WebdavConfig {
+        WebdavConfig {
+            pass_cmd: command.to_string(),
+            ..WebdavConfig::default()
+        }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn password_command_prints_the_password() {
+        let password = |command: &str| resolve_password(&with_pass_cmd(command));
+        assert_eq!(password("echo secret").unwrap(), "secret");
+        // Without a trailing newline, with CRLF, and with spaces kept.
+        assert_eq!(password("printf 'se cret '").unwrap(), "se cret ");
+        assert_eq!(password("printf 'secret\\r\\n'").unwrap(), "secret");
+        // The shell runs it, so pipes and variables work.
+        assert_eq!(password("echo top-secret | cut -d- -f2").unwrap(), "secret");
+        // It does not get our standard input.
+        assert_eq!(password("cat; echo secret").unwrap(), "secret");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn password_command_failures_are_errors() {
+        let error = |command: &str| {
+            resolve_password(&with_pass_cmd(command))
+                .unwrap_err()
+                .to_string()
+        };
+        assert!(error("exit 3").contains("the password command failed"));
+        assert!(error("echo secret; false").contains("the password command failed"));
+        assert!(error("true").contains("printed nothing"));
+        assert!(error("echo").contains("printed nothing"));
+        assert!(error("printf 'a\\nb\\n'").contains("more than one line"));
+        // The password itself never appears in an error.
+        assert!(!error("printf 'hunter2\\nsecond\\n'").contains("hunter2"));
+    }
+
+    #[test]
+    fn plain_password_needs_no_command() {
+        let config = WebdavConfig {
+            pass: "plain".to_string(),
+            ..WebdavConfig::default()
+        };
+        assert_eq!(resolve_password(&config).unwrap(), "plain");
+
+        let both = WebdavConfig {
+            pass: "plain".to_string(),
+            pass_cmd: "echo other".to_string(),
+            ..WebdavConfig::default()
+        };
+        let error = resolve_password(&both).unwrap_err().to_string();
+        assert!(
+            error.contains("use only one of pass and pass_cmd"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn a_password_flag_replaces_the_other_kind_from_the_config_file() {
+        let file = || config::parse("webdav:\n  pass_cmd: pass show caldav\n").unwrap();
+        assert_eq!(file().webdav.pass_cmd, "pass show caldav");
+
+        let merged = merge(file(), parse(&["-pass", "typed"]).unwrap());
+        assert_eq!(merged.webdav.pass, "typed");
+        assert_eq!(merged.webdav.pass_cmd, "");
+
+        let file = config::parse("webdav:\n  pass: stored\n").unwrap();
+        let merged = merge(file, parse(&["-pass-cmd", "echo x"]).unwrap());
+        assert_eq!(merged.webdav.pass, "");
+        assert_eq!(merged.webdav.pass_cmd, "echo x");
+
+        // Both as flags is a contradiction and reported when the password is needed.
+        let merged = merge(
+            Config::default(),
+            parse(&["-pass", "a", "-pass-cmd", "echo b"]).unwrap(),
+        );
+        assert!(resolve_password(&merged.webdav).is_err());
     }
 
     #[test]
