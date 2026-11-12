@@ -3,7 +3,8 @@
 //! depend on either.
 //!
 //! It does not hold for a reply that is processed before its invitation: the
-//! reply is ignored (or, with `force`, stored in place of the invitation).
+//! reply is ignored (or, with `process_replies_without_event`, stored in place
+//! of the invitation).
 //! It also does not hold with `ignore_unknown_cancellations` or
 //! `delete_cancelled`, which keep nothing to remember a cancellation by.
 

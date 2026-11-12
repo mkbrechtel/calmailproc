@@ -19,8 +19,6 @@ Usage of calmailproc:
         Delete cancelled events and occurrences instead of marking them
   -drop-alarms
         Remove alarms from events before storing them
-  -force
-        Store a reply even if its event is not stored
   -ignore-unknown-cancellations
         Ignore a cancellation if its event is not stored
   -maildir string
@@ -29,6 +27,8 @@ Usage of calmailproc:
         CalDAV password
   -process-replies
         Process attendance replies to update events
+  -process-replies-without-event
+        Store a reply as an event if its event is not stored
   -url string
         CalDAV server URL (e.g., http://localhost:5232)
   -user string
@@ -51,7 +51,7 @@ pub struct Flags {
     pub calendar: Option<String>,
     pub maildir: Option<String>,
     pub process_replies: Option<bool>,
-    pub force: Option<bool>,
+    pub process_replies_without_event: Option<bool>,
     pub ignore_unknown_cancellations: Option<bool>,
     pub delete_cancelled: Option<bool>,
     pub drop_alarms: Option<bool>,
@@ -103,7 +103,9 @@ pub fn parse_flags(args: impl IntoIterator<Item = String>) -> Result<Flags> {
             "calendar" => flags.calendar = string_value(name)?,
             "maildir" => flags.maildir = string_value(name)?,
             "process-replies" => flags.process_replies = bool_value(name)?,
-            "force" => flags.force = bool_value(name)?,
+            "process-replies-without-event" => {
+                flags.process_replies_without_event = bool_value(name)?
+            }
             "ignore-unknown-cancellations" => {
                 flags.ignore_unknown_cancellations = bool_value(name)?
             }
@@ -137,7 +139,10 @@ pub fn merge(mut config: Config, flags: Flags) -> Config {
     let processor = &mut config.processor;
     for (target, value) in [
         (&mut processor.process_replies, flags.process_replies),
-        (&mut processor.force, flags.force),
+        (
+            &mut processor.process_replies_without_event,
+            flags.process_replies_without_event,
+        ),
         (
             &mut processor.ignore_unknown_cancellations,
             flags.ignore_unknown_cancellations,
@@ -246,7 +251,7 @@ mod tests {
         let flags = parse(&[
             "-verbose=false",
             "-process-replies=true",
-            "-force",
+            "-process-replies-without-event",
             "--delete-cancelled",
             "-ignore-unknown-cancellations",
             "-drop-alarms=false",
@@ -254,7 +259,7 @@ mod tests {
         .unwrap();
         assert_eq!(flags.verbose, Some(false));
         assert_eq!(flags.process_replies, Some(true));
-        assert_eq!(flags.force, Some(true));
+        assert_eq!(flags.process_replies_without_event, Some(true));
         assert_eq!(flags.delete_cancelled, Some(true));
         assert_eq!(flags.ignore_unknown_cancellations, Some(true));
         assert_eq!(flags.drop_alarms, Some(false));
@@ -286,9 +291,15 @@ mod tests {
             "webdav:\n  url: http://file\n  user: fileuser\n  pass: filepass\n  calendar: /file/\nprocessor:\n  process_replies: true\nmaildir:\n  path: /mail\n  verbose: true\n",
         )
         .unwrap();
-        let flags = parse(&["-url", "http://flag", "-verbose=false", "-force"]).unwrap();
+        let flags = parse(&[
+            "-url",
+            "http://flag",
+            "-verbose=false",
+            "-process-replies-without-event",
+        ])
+        .unwrap();
         let merged = merge(file, flags);
-        assert!(merged.processor.force);
+        assert!(merged.processor.process_replies_without_event);
         assert!(!merged.processor.delete_cancelled);
         assert_eq!(merged.webdav.url, "http://flag");
         assert_eq!(merged.webdav.user, "fileuser");

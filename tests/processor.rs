@@ -267,7 +267,7 @@ fn test_06_stores_the_comment_of_the_reply() {
 }
 
 #[test]
-fn reply_for_unknown_event_is_ignored_unless_forced() {
+fn reply_for_unknown_event_is_ignored_unless_configured() {
     // A reply is not an event. Stored as one it would also keep the real
     // invitation out when that is processed later.
     let mut processor = processor(true);
@@ -280,14 +280,14 @@ fn reply_for_unknown_event_is_ignored_unless_forced() {
     process(&mut processor, "test-05-1.eml");
     assert_eq!(only_event(&processor).summary, "Test 5");
 
-    let mut forced = self::processor(true);
-    forced.config.force = true;
-    let status = process(&mut forced, "test-05-2.eml");
+    let mut storing = self::processor(true);
+    storing.config.process_replies_without_event = true;
+    let status = process(&mut storing, "test-05-2.eml");
     assert!(
         status.starts_with("Stored new reply event with UID "),
         "{status}"
     );
-    assert_eq!(forced.storage.event_count(), 1);
+    assert_eq!(storing.storage.event_count(), 1);
 }
 
 #[test]

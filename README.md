@@ -77,8 +77,6 @@ Usage of calmailproc:
         Delete cancelled events and occurrences instead of marking them
   -drop-alarms
         Remove alarms from events before storing them
-  -force
-        Store a reply even if its event is not stored
   -ignore-unknown-cancellations
         Ignore a cancellation if its event is not stored
   -maildir string
@@ -87,6 +85,8 @@ Usage of calmailproc:
         CalDAV password
   -process-replies
         Process attendance replies to update events
+  -process-replies-without-event
+        Store a reply as an event if its event is not stored
   -url string
         CalDAV server URL (e.g., http://localhost:5232)
   -user string
@@ -124,7 +124,7 @@ webdav:
 
 processor:
   process_replies: true
-  force: false
+  process_replies_without_event: false
   ignore_unknown_cancellations: false
   delete_cancelled: false
   drop_alarms: false
@@ -144,7 +144,7 @@ Each event in a mail is handled by its UID. If the calendar has no event with th
 - A cancellation marks the event or the occurrence with `STATUS:CANCELLED`. The calendar then shows what was cancelled. With `delete_cancelled`, the event is deleted, or the occurrence removed from the series, instead.
 - A cancellation for an event that is not in the calendar is stored as a cancelled event, so that the event stays cancelled if its invitation is processed later. `ignore_unknown_cancellations` turns that off.
 - A reply sets the status of the replying attendee and nothing else. Someone who was not invited is added as an attendee. The comment of a reply is stored with the attendee (`X-RESPONSE-COMMENT`).
-- A reply for an event that is not in the calendar is ignored. `force` stores it anyway; use that only for a single mail you want in the calendar.
+- A reply for an event that is not in the calendar is ignored. `process_replies_without_event` stores it as an event anyway; use that only for a single mail you want in the calendar.
 
 What cannot be made independent of the order: a reply that is processed before its invitation is lost.
 

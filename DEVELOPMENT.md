@@ -93,7 +93,7 @@ A mail's calendar is split by UID (`split_by_uid`); each UID is one stored event
 
 `apply_reply` (REPLY, only with `process_replies`):
 
-- No stored event: ignored, or stored with `force`.
+- No stored event: ignored, or stored as an event with `process_replies_without_event`.
 - Otherwise the reply sets `PARTSTAT` of the replying attendee in the VEVENT it refers to (the parent, or the occurrence named by `RECURRENCE-ID`). Addresses are compared without case. An attendee who is not in the event is added. The reply's `COMMENT` becomes the parameter `X-RESPONSE-COMMENT` of the attendee.
 
 `prepare_event_for_storage` removes `METHOD` and calls `set_schedule_agents`. Every stored event passes through here.
@@ -139,10 +139,10 @@ Bugs of 0.1 that are fixed:
 
 Changed behaviour:
 
-- A reply for an event that is not stored is ignored unless `-force` is given. 0.1 stored the reply as an event.
+- A reply for an event that is not stored is ignored unless `-process-replies-without-event` is given. 0.1 stored the reply as an event.
 - Events are found by UID under any resource name, written conditionally, and get `SCHEDULE-AGENT=CLIENT` when they are new on the server.
 - `-process-replies=false` and `-verbose=false` override the config file.
-- New options: `-force`, `-ignore-unknown-cancellations`, `-delete-cancelled`, `-drop-alarms`.
+- New options: `-process-replies-without-event`, `-ignore-unknown-cancellations`, `-delete-cancelled`, `-drop-alarms`.
 
 ## Testing
 

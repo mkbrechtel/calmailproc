@@ -67,8 +67,10 @@ is not in the calendar (`calItipUtils.sys.mjs`: "has already been processed",
 Implemented differently for the two cases, because of test 11.
 
 **Replies:** a reply for an event that is not stored is ignored
-(`Ignoring reply for unknown event with UID ...`). The flag `-force`
-(`processor.force` in the config file) stores it as an event, as before.
+(`Ignoring reply for unknown event with UID ...`). The flag
+`-process-replies-without-event` (`processor.process_replies_without_event`
+in the config file) stores it as an event, as before. The flag was first
+called `-force` and renamed, since it only concerns replies.
 
 **Cancellations:** a cancellation for an event that is not stored is still
 stored by default, as a cancelled event. `test/test-11.md` describes exactly
@@ -82,7 +84,7 @@ Ignoring them is available as an option: `-ignore-unknown-cancellations`
 processed after its cancellation creates the event uncancelled.
 
 Tests in `tests/processor.rs`:
-`reply_for_unknown_event_is_ignored_unless_forced` and
+`reply_for_unknown_event_is_ignored_unless_configured` and
 `test_11_out_of_sequence_mail` (default and with the option).
 
 Still order-dependent: a reply that is processed before its invitation is

@@ -25,8 +25,9 @@ use crate::storage::{Storage, StoreError, Stored};
 pub struct ProcessorConfig {
     /// Apply attendance replies (METHOD:REPLY) to stored events.
     pub process_replies: bool,
-    /// Store a reply even if its event is not stored.
-    pub force: bool,
+    /// Store a reply as an event if its event is not stored. By default such
+    /// a reply is ignored.
+    pub process_replies_without_event: bool,
     /// Ignore a cancellation if its event is not stored. By default it is
     /// stored, so that the event stays cancelled when the request for it is
     /// processed later (test 11).
@@ -365,7 +366,7 @@ impl<S: Storage> Processor<S> {
         let Some(stored) = stored else {
             // A reply is not an event. Stored as one, it would also keep the
             // real invitation out if that is processed later.
-            if !self.config.force {
+            if !self.config.process_replies_without_event {
                 return Ok(Action::Nothing(format!(
                     "Ignoring reply for unknown event with UID {uid}"
                 )));
