@@ -157,8 +157,15 @@ fn check_instance_merge(dir: &Path) -> Result<String, String> {
     let written = write_calendar(&parent.properties, &parent.components);
     let merged_text = unfold(&written);
     let merged = read_calendar(&merged_text)?;
-    let events: Vec<&Component> = merged.components.iter().filter(|c| c.name == "VEVENT").collect();
-    let masters = events.iter().filter(|e| e.find_prop("RECURRENCE-ID").is_none()).count();
+    let events: Vec<&Component> = merged
+        .components
+        .iter()
+        .filter(|c| c.name == "VEVENT")
+        .collect();
+    let masters = events
+        .iter()
+        .filter(|e| e.find_prop("RECURRENCE-ID").is_none())
+        .count();
     let has_instance = events.iter().any(|e| {
         e.find_prop("RECURRENCE-ID").map(|p| p.val.as_str()) == Some(recurrence_id.as_str())
     });
@@ -209,7 +216,10 @@ fn check_calendar(ics: &str) -> Result<String, String> {
     // line into a parameter value instead, which silently corrupts the tree
     // (test-12: `ORGANIZER;CN=Sixt SE` swallowed the UID line). Check first.
     if let Some(bad) = content_lines(ics).iter().find(|l| !l.contains(':')) {
-        return Err(format!("malformed content line without ':': {}", truncate(bad, 60)));
+        return Err(format!(
+            "malformed content line without ':': {}",
+            truncate(bad, 60)
+        ));
     }
     let cal = read_calendar(&unfolded).map_err(|e| format!("parse error: {}", first_line(&e)))?;
     if cal.components.is_empty() && cal.properties.is_empty() {
@@ -227,7 +237,12 @@ fn check_calendar(ics: &str) -> Result<String, String> {
     let written = write_calendar(&cal.properties, &cal.components);
     let reparsed_text = unfold(&written);
     let reparsed = read_calendar(&reparsed_text).map_err(|e| format!("re-parse error: {e}"))?;
-    if let Some(diff) = first_difference(&cal.properties, &cal.components, &reparsed.properties, &reparsed.components) {
+    if let Some(diff) = first_difference(
+        &cal.properties,
+        &cal.components,
+        &reparsed.properties,
+        &reparsed.components,
+    ) {
         return Err(format!("ROUND-TRIP LOSS: {diff}"));
     }
     let before = content_lines(ics);
@@ -235,7 +250,11 @@ fn check_calendar(ics: &str) -> Result<String, String> {
     if std::env::var_os("SPIKE_DUMP").is_some() {
         // Show every line the writer changed: `SPIKE_DUMP=1 cargo run --example ...`
         for (a, b) in before.iter().zip(after.iter()).filter(|(a, b)| a != b) {
-            println!("    in:  {}\n    out: {}", truncate(a, 110), truncate(b, 110));
+            println!(
+                "    in:  {}\n    out: {}",
+                truncate(a, 110),
+                truncate(b, 110)
+            );
         }
     }
     if before.len() != after.len() {
@@ -304,7 +323,11 @@ fn check_calendar(ics: &str) -> Result<String, String> {
     }
 
     // Fields the processor reads.
-    let events: Vec<&Component> = cal.components.iter().filter(|c| c.name == "VEVENT").collect();
+    let events: Vec<&Component> = cal
+        .components
+        .iter()
+        .filter(|c| c.name == "VEVENT")
+        .collect();
     let first = events.first().ok_or("no VEVENT")?;
     let get = |name: &str| first.find_prop(name).map(|p| p.val.as_str().to_string());
     let method = cal
@@ -333,7 +356,11 @@ fn validate(cal_props: &[Property], components: &[Component]) -> Result<(), Stri
     for name in ["PRODID", "VERSION"] {
         match count(cal_props, name) {
             1 => {}
-            n => return Err(format!("invalid: VCALENDAR wants exactly one {name}, got {n}")),
+            n => {
+                return Err(format!(
+                    "invalid: VCALENDAR wants exactly one {name}, got {n}"
+                ));
+            }
         }
     }
     let events: Vec<&Component> = components.iter().filter(|c| c.name == "VEVENT").collect();
@@ -348,9 +375,23 @@ fn validate(cal_props: &[Property], components: &[Component]) -> Result<(), Stri
             }
         }
         for name in [
-            "DTSTART", "CLASS", "CREATED", "DESCRIPTION", "GEO", "LAST-MODIFIED", "LOCATION",
-            "ORGANIZER", "PRIORITY", "SEQUENCE", "STATUS", "SUMMARY", "TRANSP", "URL",
-            "RECURRENCE-ID", "DTEND", "DURATION",
+            "DTSTART",
+            "CLASS",
+            "CREATED",
+            "DESCRIPTION",
+            "GEO",
+            "LAST-MODIFIED",
+            "LOCATION",
+            "ORGANIZER",
+            "PRIORITY",
+            "SEQUENCE",
+            "STATUS",
+            "SUMMARY",
+            "TRANSP",
+            "URL",
+            "RECURRENCE-ID",
+            "DTEND",
+            "DURATION",
         ] {
             let n = count(&event.properties, name);
             if n > 1 {
@@ -435,7 +476,9 @@ fn first_difference(
         if a.name != b.name {
             return Some(format!("component {} != {}", a.name, b.name));
         }
-        if let Some(d) = first_difference(&a.properties, &a.components, &b.properties, &b.components) {
+        if let Some(d) =
+            first_difference(&a.properties, &a.components, &b.properties, &b.components)
+        {
             return Some(d);
         }
     }

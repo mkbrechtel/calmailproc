@@ -6,9 +6,9 @@
 set -e
 
 echo "=== Building calmailproc binary ==="
-go build -o test/calmailproc main.go
+cargo build
 
-calmailproc="./test/calmailproc"
+calmailproc="./target/debug/calmailproc"
 XANDIKOS_PID=""
 
 cleanup() {
