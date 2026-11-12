@@ -125,7 +125,7 @@ All sections and keys are optional. If `maildir.path` is set (or `-maildir` is g
 
 Each event is stored as `{calendar}/{UID}.ics` on the CalDAV server, so calendar clients that use the same calendar see the events. The `METHOD` property, which only belongs to the mail transport, is removed before storing.
 
-Every organizer and attendee is stored with `SCHEDULE-AGENT=CLIENT`. This tells a CalDAV server with scheduling support that the invitations have already been exchanged by mail, so it does not send its own.
+Organizers and attendees of a new event are stored with `SCHEDULE-AGENT=CLIENT`. This tells a CalDAV server with scheduling support that the invitations have already been exchanged by mail, so it does not send its own. An event that is already on the server keeps the setting it has.
 
 ## Development
 

@@ -71,7 +71,8 @@ Storage has no business logic and does not compare sequence numbers.
   4. The stored event already has occurrence updates: replace the parent event and keep them (`handle_parent_event_update`), without comparing sequence numbers.
   5. Otherwise compare with `ical::compare_events`; ignore the mail if the stored event is newer, else replace the parent event.
 - `process_event_reply`: `METHOD:REPLY`, only if reply processing is enabled. `update_attendee_status` sets the replying attendee's `PARTSTAT` in the stored event. Addresses are compared case-insensitively.
-- `prepare_event_for_storage`: removes `METHOD` and sets `SCHEDULE-AGENT=CLIENT` on every `ORGANIZER` and `ATTENDEE`, so that a CalDAV server with scheduling (RFC 6638) does not mail the participants again. Every stored event passes through here.
+- `prepare_event_for_storage`: removes `METHOD` and calls `set_schedule_agents`. Every stored event passes through here.
+- `set_schedule_agents`: tells a CalDAV server with scheduling (RFC 6638) not to mail the participants again. A participant that is new on the server gets `SCHEDULE-AGENT=CLIENT`; a participant already in the stored event keeps the stored value, because changing an attendee from the default to `CLIENT` makes a server send a CANCEL if the calendar owner is the organizer (section 3.2.1.2).
 
 The two input modes:
 
@@ -94,7 +95,7 @@ One `Error` type holding a message. `result.context("parsing email")?` prefixes 
 2. `stdin` or `maildir`: read the raw email.
 3. `email`: parse the mail, find the calendar part.
 4. `ical`: parse the calendar into an `Event`.
-5. `processor`: validate, compare with the stored event, merge, remove `METHOD`, set `SCHEDULE-AGENT=CLIENT`.
+5. `processor`: validate, compare with the stored event, merge, remove `METHOD`, set `SCHEDULE-AGENT`.
 6. `storage`: `PUT` the event.
 7. `stdin` or `maildir`: print the status.
 

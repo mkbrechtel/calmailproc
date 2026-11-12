@@ -87,15 +87,33 @@ Tests to add:
 **Resolved in:** version 0.2.0 (branch `rewrite-in-rust`)
 **Resolved by:** mkbrechtel, with Claude
 
-`prepare_event_for_storage()` in `src/processor/mod.rs` now sets
-`SCHEDULE-AGENT=CLIENT` on the `ORGANIZER` and every `ATTENDEE` of every
-`VEVENT`, replacing any value the mail carried. Every stored event passes
-through that function, so this covers new events, updates, cancellations,
-occurrence merges, parent updates and replies.
+`prepare_event_for_storage()` in `src/processor/mod.rs` calls
+`set_schedule_agents()` for every event before it is stored:
 
-Tests: `stored_events_tell_the_server_not_to_schedule` and
-`incoming_schedule_agent_server_is_overwritten` in `tests/processor.rs`, and
-a check on every event stored by the binary in `tests/end_to_end.rs`.
+- A participant (`ORGANIZER` or `ATTENDEE`) that is new on the server gets
+  `SCHEDULE-AGENT=CLIENT`, replacing any value the mail carried. That is every
+  participant of a new event, and participants added to a stored one.
+- A participant that is already in the stored event keeps the stored value,
+  including "no parameter".
+
+The second rule differs from the proposal above, which said to set the
+parameter on all paths. That would be harmful: RFC 6638, section 3.2.1.2,
+requires a server to send an attendee a CANCEL when the organizer's stored
+event changes that attendee from the default (`SERVER`) to `CLIENT`. An event
+that is already on the server without the parameter, for example one created
+in a calendar client or stored by calmailproc 0.1, must stay as it is.
+Evolution (evolution-data-server, `ecb_caldav_save_component_sync`) has the
+same rule and only sets the parameter when it creates a resource.
+
+Consequence: for events that were stored without the parameter, the server
+keeps doing its own scheduling, as it did under 0.1.
+
+Tests in `tests/processor.rs`:
+`stored_events_tell_the_server_not_to_schedule`,
+`incoming_schedule_agent_server_is_overwritten`,
+`schedule_agent_of_already_stored_participants_is_not_changed`,
+`schedule_agent_follows_the_stored_event_on_updates`, and a check on every
+event stored by the binary in `tests/end_to_end.rs`.
 
 Not verified against a server that actually sends scheduling mails: Xandikos,
 used by `test.sh`, has no mail delivery. Whether a given server honours the

@@ -56,6 +56,10 @@ impl Property {
             .map(|(_, v)| v.as_str())
     }
 
+    pub fn remove_param(&mut self, key: &str) {
+        self.params.retain(|(k, _)| !k.eq_ignore_ascii_case(key));
+    }
+
     pub fn set_param(&mut self, key: &str, value: &str) {
         match self
             .params

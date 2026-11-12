@@ -78,7 +78,7 @@ impl<S: Storage> Processor<S> {
             .map_err(|e| fail(format!("Invalid calendar data for event with UID {uid}"), e))?;
 
         let Some(existing) = self.get_existing(uid)? else {
-            self.store(event, "Error storing new event", "storing event")?;
+            self.store(event, None, "Error storing new event", "storing event")?;
             return Ok(format!("Stored new event with UID {uid}"));
         };
 
@@ -88,7 +88,7 @@ impl<S: Storage> Processor<S> {
             let updated = handle_recurring_event(&existing, event)
                 .context("handling recurring instance")
                 .map_err(|e| fail("Error handling recurring instance", e))?;
-            self.validate_and_store(&updated, "instance update")?;
+            self.validate_and_store(&updated, &existing, "instance update")?;
             return Ok(format!("Updated recurring event instance with UID {uid}"));
         }
 
@@ -98,7 +98,7 @@ impl<S: Storage> Processor<S> {
             let updated = handle_parent_event_update(&existing, event)
                 .context("handling parent event update")
                 .map_err(|e| fail("Error handling parent event update", e))?;
-            self.validate_and_store(&updated, "parent update")?;
+            self.validate_and_store(&updated, &existing, "parent update")?;
             return Ok(format!(
                 "Updated parent event while preserving instances with UID {uid}"
             ));
@@ -117,7 +117,7 @@ impl<S: Storage> Processor<S> {
         let updated = handle_parent_event_update(&existing, event)
             .context("handling parent event update")
             .map_err(|e| fail("Error handling parent event update", e))?;
-        self.validate_and_store(&updated, "parent update")?;
+        self.validate_and_store(&updated, &existing, "parent update")?;
         Ok(format!(
             "Updated event with UID {uid}, new sequence: {}",
             event.sequence
@@ -140,13 +140,24 @@ impl<S: Storage> Processor<S> {
             })?;
 
         let Some(mut existing) = self.get_existing(uid)? else {
-            self.store(reply, "Error storing new reply event", "storing event")?;
+            self.store(
+                reply,
+                None,
+                "Error storing new reply event",
+                "storing event",
+            )?;
             return Ok(format!("Stored new reply event with UID {uid}"));
         };
 
+        let stored = existing.clone();
         if let Err(error) = update_attendee_status(reply, &mut existing) {
             eprintln!("Warning: Failed to update attendee status: {error}");
-            self.store(reply, "Error storing reply event", "storing event")?;
+            self.store(
+                reply,
+                Some(&stored),
+                "Error storing reply event",
+                "storing event",
+            )?;
             return Ok(format!(
                 "Stored reply event with UID {uid} (attendee update failed)"
             ));
@@ -164,6 +175,7 @@ impl<S: Storage> Processor<S> {
             })?;
         self.store(
             &existing,
+            Some(&stored),
             "Error storing updated event with attendee status",
             "storing updated event",
         )?;
@@ -180,6 +192,7 @@ impl<S: Storage> Processor<S> {
     fn validate_and_store(
         &mut self,
         event: &Event,
+        stored: &Event,
         step: &str,
     ) -> std::result::Result<(), Failure> {
         let uid = &event.uid;
@@ -193,18 +206,21 @@ impl<S: Storage> Processor<S> {
             })?;
         self.store(
             event,
+            Some(stored),
             "Error storing updated event",
             "storing updated event",
         )
     }
 
+    /// Stores an event. `stored` is the event it replaces, if there is one.
     fn store(
         &mut self,
         event: &Event,
+        stored: Option<&Event>,
         status: &str,
         context: &str,
     ) -> std::result::Result<(), Failure> {
-        let prepared = prepare_event_for_storage(event)
+        let prepared = prepare_event_for_storage(event, stored)
             .context("preparing event")
             .map_err(|e| fail("Error preparing event for storage", e))?;
         self.storage
@@ -349,27 +365,56 @@ fn matches_recurrence_id(a: &Component, b: &Component) -> bool {
 }
 
 /// Prepares an event for the CalDAV server. Every stored event passes through
-/// here.
+/// here. `stored` is the event it replaces, if there is one.
 ///
 /// - Removes the METHOD property, which belongs to the mail transport.
-/// - Sets `SCHEDULE-AGENT=CLIENT` on every ORGANIZER and ATTENDEE (RFC 6638,
-///   section 7.1). Without it a server with scheduling support treats the
-///   stored event as its own to schedule and mails the participants again,
-///   although the mail exchange has already happened.
-fn prepare_event_for_storage(event: &Event) -> Result<Event> {
+/// - Sets the SCHEDULE-AGENT parameter of every ORGANIZER and ATTENDEE; see
+///   [`set_schedule_agents`].
+fn prepare_event_for_storage(event: &Event, stored: Option<&Event>) -> Result<Event> {
     let mut calendar = ical::decode(&event.raw_data).context("decoding calendar")?;
     calendar.remove_props("METHOD");
-    for vevent in calendar.events_mut() {
-        for participant in vevent
-            .properties
-            .iter_mut()
-            .filter(|p| p.name == "ORGANIZER" || p.name == "ATTENDEE")
-        {
-            participant.set_param("SCHEDULE-AGENT", "CLIENT");
-        }
-    }
+    let stored_calendar = stored
+        .map(|stored| ical::decode(&stored.raw_data).context("decoding stored calendar"))
+        .transpose()?;
+    set_schedule_agents(&mut calendar, stored_calendar.as_ref());
     Ok(Event {
         raw_data: ical::encode(&calendar).context("encoding calendar")?,
         ..event.clone()
     })
+}
+
+/// Tells a CalDAV server with scheduling support (RFC 6638) not to send its
+/// own invitations for an event that was already exchanged by mail.
+///
+/// - A participant that is new on the server gets `SCHEDULE-AGENT=CLIENT`:
+///   every participant of a new event, and participants added to a stored one.
+/// - A participant that is already in the stored event keeps the stored
+///   value, including "no parameter". Changing it is not neutral: if the
+///   calendar owner is the organizer, a server must send the attendee a
+///   CANCEL when an attendee goes from the default (`SERVER`) to `CLIENT`
+///   (RFC 6638, section 3.2.1.2). Evolution has the same rule.
+fn set_schedule_agents(calendar: &mut Component, stored: Option<&Component>) {
+    const PARAM: &str = "SCHEDULE-AGENT";
+    let is_participant = |p: &ical::Property| p.name == "ORGANIZER" || p.name == "ATTENDEE";
+
+    let stored_participants: Vec<&ical::Property> = stored
+        .iter()
+        .flat_map(|stored| stored.events())
+        .flat_map(|vevent| vevent.properties.iter())
+        .filter(|p| is_participant(p))
+        .collect();
+
+    for vevent in calendar.events_mut() {
+        for participant in vevent.properties.iter_mut().filter(|p| is_participant(p)) {
+            let stored_participant = stored_participants.iter().find(|stored| {
+                stored.name == participant.name
+                    && stored.value.eq_ignore_ascii_case(&participant.value)
+            });
+            match stored_participant.map(|stored| stored.param(PARAM)) {
+                Some(Some(agent)) => participant.set_param(PARAM, agent),
+                Some(None) => participant.remove_param(PARAM),
+                None => participant.set_param(PARAM, "CLIENT"),
+            }
+        }
+    }
 }

@@ -654,6 +654,99 @@ fn incoming_schedule_agent_server_is_overwritten() {
     );
 }
 
+/// Puts a mail's event into storage unchanged, as a calendar client or
+/// calmailproc 0.1 would have stored it: without any SCHEDULE-AGENT.
+fn store_as_is(processor: &mut TestProcessor, raw: &[u8]) {
+    let event = calmailproc::email::parse(raw).unwrap().event.unwrap();
+    assert!(!event.raw_data.contains("SCHEDULE-AGENT=CLIENT"));
+    processor.storage.store_event(&event).unwrap();
+}
+
+#[test]
+fn schedule_agent_of_already_stored_participants_is_not_changed() {
+    // If the calendar owner is the organizer, a server must send an attendee
+    // a CANCEL when the attendee goes from the default to SCHEDULE-AGENT=CLIENT
+    // (RFC 6638, section 3.2.1.2). An event that is already on the server
+    // without the parameter must therefore stay without it.
+    let mut processor = processor(true);
+    store_as_is(&mut processor, &mail("test-05-1.eml"));
+
+    let status = process(&mut processor, "test-05-2.eml");
+    assert!(status.starts_with("Updated attendee status"), "{status}");
+    let replied = only_event(&processor);
+    assert_eq!(
+        partstat(&replied, "markus.brechtel@uk-koeln.de").as_deref(),
+        Some("ACCEPTED")
+    );
+    for (participant, agent) in schedule_agents(&replied) {
+        assert_eq!(agent, None, "{participant} must not gain SCHEDULE-AGENT");
+    }
+}
+
+#[test]
+fn schedule_agent_follows_the_stored_event_on_updates() {
+    let uid = "schedule-agent-update";
+    let with_attendees = |sequence: u32, attendees: &str| {
+        String::from_utf8(parent_mail(uid, sequence))
+            .unwrap()
+            .replace(
+                "ORGANIZER:organizer@example.com",
+                &format!("ORGANIZER:mailto:organizer@example.com\n{attendees}"),
+            )
+            .into_bytes()
+    };
+
+    // Stored by something else: A without the parameter, B with NONE.
+    let mut processor = processor(true);
+    store_as_is(
+        &mut processor,
+        &with_attendees(
+            0,
+            "ATTENDEE:mailto:a@example.com\nATTENDEE;SCHEDULE-AGENT=NONE:mailto:b@example.com",
+        ),
+    );
+
+    // The update mail says CLIENT for A, nothing for B, and adds C.
+    let status = process_raw(
+        &mut processor,
+        &with_attendees(
+            1,
+            "ATTENDEE;SCHEDULE-AGENT=CLIENT:MAILTO:A@example.com\nATTENDEE:mailto:b@example.com\nATTENDEE:mailto:c@example.com",
+        ),
+    );
+    assert!(status.ends_with(", new sequence: 1"), "{status}");
+
+    let agents = schedule_agents(&only_event(&processor));
+    let agent_of = |address: &str| {
+        agents
+            .iter()
+            .find(|(participant, _)| participant.to_lowercase().ends_with(address))
+            .unwrap_or_else(|| panic!("{address} missing in {agents:?}"))
+            .1
+            .clone()
+    };
+    assert_eq!(
+        agent_of("organizer@example.com"),
+        None,
+        "stored without: stays without"
+    );
+    assert_eq!(
+        agent_of("a@example.com"),
+        None,
+        "stored without: stays without"
+    );
+    assert_eq!(
+        agent_of("b@example.com").as_deref(),
+        Some("NONE"),
+        "stored value is kept"
+    );
+    assert_eq!(
+        agent_of("c@example.com").as_deref(),
+        Some("CLIENT"),
+        "new attendee"
+    );
+}
+
 // --- Synthetic recurring event mails -------------------------------------
 
 /// A multipart mail with one calendar part holding a single VEVENT.
