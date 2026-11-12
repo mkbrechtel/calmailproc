@@ -57,6 +57,7 @@ Any other context, logs, or screenshots.
 
 When an issue is resolved:
 - Update the **Status** field in the issue file to `Resolved`
+- Move the file to `issues/archive/`, so that this directory only lists open issues
 - Add a section at the end documenting the resolution:
   ```markdown
   ## Resolution

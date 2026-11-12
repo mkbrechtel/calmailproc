@@ -730,7 +730,7 @@ fn assert_client_scheduling(event: &Event, expected_participants: usize, context
 
 #[test]
 fn stored_events_tell_the_server_not_to_schedule() {
-    // issues/bug-missing-schedule-agent-client.md: without SCHEDULE-AGENT=CLIENT
+    // issues/archive/bug-missing-schedule-agent-client.md: without SCHEDULE-AGENT=CLIENT
     // a CalDAV server with scheduling mails the participants again.
 
     // New event: organizer and both attendees.
