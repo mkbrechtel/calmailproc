@@ -915,3 +915,16 @@ fn stored_event_with_several_occurrences_round_trips() {
     assert_eq!(value(&occurrences[0], "SUMMARY"), "Modified Instance 1");
     assert_eq!(value(&occurrences[1], "SUMMARY"), "Modified Instance 2");
 }
+
+#[test]
+fn test_21_empty_line_in_folded_attendee() {
+    let mut processor = processor(true);
+    process(&mut processor, "test-21.eml");
+    let event = only_event(&processor);
+    assert_eq!(
+        event.uid,
+        "174605481146O13707L6K9299P89O142968165632307713QV0SAYH58677921159580335815132401EM4K58SBI6393M532C57GJS7P64F3B75"
+    );
+    assert_eq!(parents(&event).len(), 1);
+    assert_eq!(occurrences(&event).len(), 226);
+}
