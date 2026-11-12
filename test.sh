@@ -6,9 +6,9 @@
 set -e
 
 echo "=== Building calmailproc binary ==="
-go build -o test/calmailproc main.go
+cargo build
 
-calmailproc="./test/calmailproc"
+calmailproc="./target/debug/calmailproc"
 XANDIKOS_PID=""
 
 cleanup() {
@@ -56,10 +56,11 @@ for mail in test/maildir/cur/test-*.eml; do
     echo
     echo "Processing $mail with CalDAV storage (calendar1)"
 
+    # Tests 12-15 contain invalid calendar data and must be rejected.
     expected_exit_code=0
-    if [[ "$mail" == *"test-12.eml" ]] || [[ "$mail" == *"test-13.eml" ]] || [[ "$mail" == *"test-14.eml" ]] || [[ "$mail" == *"test-15.eml" ]]; then
-        expected_exit_code=1
-    fi
+    case "$(basename "$mail")" in
+        test-12.eml|test-13.eml|test-14.eml|test-15.eml) expected_exit_code=1 ;;
+    esac
 
     set +e
     $calmailproc $caldav_args1 < "$mail"
@@ -142,6 +143,32 @@ if [ "$event_count1" = "$event_count2" ] && [ "$event_count2" = "$event_count3" 
     echo "✓ All modes produce same results!"
 else
     echo "✗ Event count mismatch: calendar1=$event_count1, calendar2=$event_count2, calendar3=$event_count3"
+    exit 1
+fi
+
+echo
+echo "=== Testing an event stored under another name (calendar4) ==="
+
+# An event that a calendar client or the server put into the calendar does not
+# have to be named {UID}.ics. calmailproc has to find it by its UID and update
+# it where it is.
+curl -X MKCALENDAR http://localhost:15232/user/calendars/calendar4/ >/dev/null 2>&1 || true
+caldav_args4="-url http://localhost:15232 -user test -pass pass -calendar /user/calendars/calendar4/"
+test7_resource=$(curl -s -X PROPFIND http://localhost:15232/user/calendars/calendar1/ -H "Depth: 1" \
+    | grep -o 'href>[^<]*FD5688352A1F9347AAD14BB6A7C46727\.ics' | sed 's/^href>//')
+curl -s -f "http://localhost:15232$test7_resource" \
+    | curl -s -f -X PUT -H "Content-Type: text/calendar" --data-binary @- \
+        http://localhost:15232/user/calendars/calendar4/client-chosen-name.ics >/dev/null
+
+$calmailproc $caldav_args4 < test/maildir/cur/test-07-3.eml
+
+resources4=$(curl -s -X PROPFIND http://localhost:15232/user/calendars/calendar4/ -H "Depth: 1" \
+    | grep -o 'href>[^<]*\.ics' | sed 's/^href>//')
+echo "CalDAV calendar4 resources: $resources4"
+if [ "$resources4" = "/user/calendars/calendar4/client-chosen-name.ics" ]; then
+    echo "✓ The event was found by its UID and updated in place"
+else
+    echo "✗ Expected only client-chosen-name.ics in calendar4"
     exit 1
 fi
 

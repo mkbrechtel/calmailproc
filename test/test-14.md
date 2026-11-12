@@ -16,7 +16,7 @@ The processor should:
 ## Error Message
 
 ```
-validation error for event e516a376-6363-41d4-a373-23e021395068: encoding calendar: encoding calendar: ical: failed to encode "VCALENDAR": want exactly one "PRODID" property, got 0
+validation error for event e516a376-6363-41d4-a373-23e021395068: encoding calendar: failed to encode VCALENDAR: want exactly one PRODID property, got 0
 ```
 
 ## Original Event Data

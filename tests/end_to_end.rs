@@ -1,0 +1,511 @@
+//! End-to-end tests: the real binary against a CalDAV server.
+//!
+//! The server here is a minimal stand-in that stores whatever is PUT and
+//! serves it on GET, with basic authentication. That is all calmailproc needs
+//! from CalDAV. `test.sh` runs the same scenarios against Xandikos.
+
+use std::collections::BTreeMap;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::path::PathBuf;
+use std::process::{Command, Output, Stdio};
+use std::sync::{Arc, Mutex};
+
+use calmailproc::ical;
+
+/// "test:pass" in base64.
+const AUTHORIZATION: &str = "Basic dGVzdDpwYXNz";
+const CALENDAR: &str = "/user/calendars/calendar1/";
+
+/// Mails with invalid calendar data, which the binary rejects with an error.
+const REJECTED: [&str; 4] = ["test-12.eml", "test-13.eml", "test-14.eml", "test-15.eml"];
+
+type Store = Arc<Mutex<BTreeMap<String, String>>>;
+
+struct FakeCalDav {
+    url: String,
+    store: Store,
+}
+
+impl FakeCalDav {
+    fn start() -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let store = Store::default();
+        let shared = store.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming().flatten() {
+                let _ = handle(stream, &shared);
+            }
+        });
+        FakeCalDav { url, store }
+    }
+
+    /// Stored calendar texts by path.
+    fn events(&self) -> BTreeMap<String, String> {
+        self.store.lock().unwrap().clone()
+    }
+
+    fn args(&self) -> Vec<String> {
+        [
+            "-process-replies",
+            "-url",
+            &self.url,
+            "-user",
+            "test",
+            "-pass",
+            "pass",
+            "-calendar",
+            CALENDAR,
+        ]
+        .map(String::from)
+        .to_vec()
+    }
+}
+
+/// A stable ETag for some content.
+fn etag(content: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    content.hash(&mut hasher);
+    format!("\"{:x}\"", hasher.finish())
+}
+
+fn handle(stream: TcpStream, store: &Store) -> std::io::Result<()> {
+    let mut reader = BufReader::new(stream.try_clone()?);
+    let mut request_line = String::new();
+    reader.read_line(&mut request_line)?;
+    let mut parts = request_line.split_whitespace();
+    let (method, path) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
+
+    let mut content_length = 0;
+    let mut authorized = false;
+    let mut if_match = None;
+    let mut if_none_match = None;
+    loop {
+        let mut line = String::new();
+        reader.read_line(&mut line)?;
+        let line = line.trim_end();
+        if line.is_empty() {
+            break;
+        }
+        if let Some((name, value)) = line.split_once(':') {
+            let value = value.trim().to_string();
+            match name.to_ascii_lowercase().as_str() {
+                "content-length" => content_length = value.parse().unwrap_or(0),
+                "authorization" => authorized = value == AUTHORIZATION,
+                "if-match" => if_match = Some(value),
+                "if-none-match" => if_none_match = Some(value),
+                _ => {}
+            }
+        }
+    }
+    let mut body = vec![0; content_length];
+    reader.read_exact(&mut body)?;
+    let body = String::from_utf8_lossy(&body).into_owned();
+
+    let mut store = store.lock().unwrap();
+    let current = store.get(path).cloned();
+    // The conditions a CalDAV server checks before changing a resource.
+    let precondition_failed = match (&if_match, &if_none_match, &current) {
+        (Some(expected), _, Some(current)) => *expected != etag(current),
+        (Some(_), _, None) => true,
+        (None, Some(_), Some(_)) => true,
+        _ => false,
+    };
+
+    let (status, headers, response_body) = if !authorized {
+        (
+            "401 Unauthorized",
+            String::new(),
+            "wrong credentials".to_string(),
+        )
+    } else {
+        match method {
+            "PUT" | "DELETE" if precondition_failed => {
+                ("412 Precondition Failed", String::new(), String::new())
+            }
+            "PUT" => {
+                let headers = format!("ETag: {}\r\n", etag(&body));
+                store.insert(path.to_string(), body);
+                ("201 Created", headers, String::new())
+            }
+            "DELETE" => match store.remove(path) {
+                Some(_) => ("204 No Content", String::new(), String::new()),
+                None => ("404 Not Found", String::new(), String::new()),
+            },
+            "GET" => match current {
+                Some(ics) => ("200 OK", format!("ETag: {}\r\n", etag(&ics)), ics),
+                None => ("404 Not Found", String::new(), String::new()),
+            },
+            // calendar-query for a UID: every resource under the path whose
+            // data contains the UID (a substring match, like a real server).
+            "REPORT" => {
+                let uid = body
+                    .split("<C:text-match collation=\"i;octet\">")
+                    .nth(1)
+                    .and_then(|rest| rest.split("</C:text-match>").next())
+                    .unwrap_or_default()
+                    .replace("&amp;", "&");
+                let responses: String = store
+                    .iter()
+                    .filter(|(resource, ics)| {
+                        // Long lines are folded; match on the unfolded text.
+                        let unfolded = ics.replace("\r\n ", "").replace("\n ", "");
+                        resource.starts_with(path) && unfolded.contains(&uid)
+                    })
+                    .map(|(resource, ics)| {
+                        format!(
+                            "<d:response><d:href>{resource}</d:href><d:propstat><d:prop><d:getetag>{}</d:getetag><c:calendar-data>{}</c:calendar-data></d:prop></d:propstat></d:response>",
+                            etag(ics).replace('"', "&quot;"),
+                            ics.replace('&', "&amp;").replace('<', "&lt;")
+                        )
+                    })
+                    .collect();
+                (
+                    "207 Multi-Status",
+                    String::new(),
+                    format!(
+                        "<?xml version=\"1.0\"?><d:multistatus xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\">{responses}</d:multistatus>"
+                    ),
+                )
+            }
+            _ => ("405 Method Not Allowed", String::new(), String::new()),
+        }
+    };
+    drop(store);
+    let mut stream = stream;
+    write!(
+        stream,
+        "HTTP/1.1 {status}\r\n{headers}Content-Type: text/calendar\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response_body}",
+        response_body.len()
+    )
+}
+
+/// A fresh, empty directory to use as XDG_CONFIG_HOME, so the tests never
+/// read the config file of whoever runs them.
+fn config_home(name: &str) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("calmailproc-e2e-{}-{name}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("calmailproc")).unwrap();
+    dir
+}
+
+fn run(args: &[String], stdin: Option<&[u8]>, config_home: &PathBuf) -> Output {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_calmailproc"))
+        .args(args)
+        .env("XDG_CONFIG_HOME", config_home)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    // A closed pipe is fine: the binary may exit without reading stdin.
+    let _ = child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(stdin.unwrap_or_default());
+    child.wait_with_output().unwrap()
+}
+
+fn text(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+fn test_mails() -> Vec<PathBuf> {
+    let mut mails: Vec<PathBuf> = std::fs::read_dir("test/maildir/cur")
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "eml"))
+        .collect();
+    mails.sort();
+    mails
+}
+
+/// Feeds every test mail to the binary on stdin, like a mail filter would.
+fn run_stdin_mode(server: &FakeCalDav, config_home: &PathBuf) {
+    for mail in test_mails() {
+        let name = mail.file_name().unwrap().to_string_lossy().into_owned();
+        let output = run(
+            &server.args(),
+            Some(&std::fs::read(&mail).unwrap()),
+            config_home,
+        );
+        let expected = if REJECTED.contains(&name.as_str()) {
+            1
+        } else {
+            0
+        };
+        assert_eq!(
+            output.status.code(),
+            Some(expected),
+            "{name}: stdout: {} stderr: {}",
+            text(&output.stdout),
+            text(&output.stderr)
+        );
+        if expected == 1 {
+            assert!(text(&output.stderr).starts_with("Error: error processing stdin: "));
+            assert!(output.stdout.is_empty());
+        } else {
+            assert_eq!(text(&output.stdout).lines().count(), 1, "one status line");
+        }
+    }
+}
+
+#[test]
+fn stdin_maildir_and_config_file_modes_store_the_same_events() {
+    let empty_config = config_home("empty");
+
+    // Mode 1: one mail at a time on stdin.
+    let stdin_server = FakeCalDav::start();
+    run_stdin_mode(&stdin_server, &empty_config);
+    let stdin_events = stdin_server.events();
+    assert_eq!(stdin_events.len(), 19);
+
+    // Mode 2: the whole maildir in one run.
+    let maildir_server = FakeCalDav::start();
+    let mut args = maildir_server.args();
+    args.extend(["-maildir", "test/maildir", "-verbose"].map(String::from));
+    let output = run(&args, None, &empty_config);
+    assert_eq!(output.status.code(), Some(0), "{}", text(&output.stderr));
+    let stderr = text(&output.stderr);
+    assert_eq!(
+        stderr.matches("Warning: failed to process").count(),
+        REJECTED.len(),
+        "{stderr}"
+    );
+    assert_eq!(maildir_server.events(), stdin_events);
+
+    // Mode 3: all settings from the config file.
+    let config_server = FakeCalDav::start();
+    let with_config = config_home("config");
+    std::fs::write(
+        with_config.join("calmailproc").join("config.yaml"),
+        format!(
+            "webdav:\n  url: {}\n  user: test\n  pass: pass\n  calendar: {CALENDAR}\n\nprocessor:\n  process_replies: true\n\nmaildir:\n  path: test/maildir\n  verbose: false\n",
+            config_server.url
+        ),
+    )
+    .unwrap();
+    let output = run(&[], None, &with_config);
+    assert_eq!(output.status.code(), Some(0), "{}", text(&output.stderr));
+    assert_eq!(config_server.events(), stdin_events);
+
+    // What ended up on the server.
+    for (path, ics) in &stdin_events {
+        assert!(
+            path.starts_with(CALENDAR) && path.ends_with(".ics"),
+            "{path}"
+        );
+        let calendar = ical::decode(ics).unwrap();
+        ical::validate(&calendar).unwrap();
+        assert!(
+            !calendar.has_prop("METHOD"),
+            "{path}: METHOD must not be stored"
+        );
+        // Otherwise a server with scheduling would mail the participants again.
+        for participant in calendar
+            .events()
+            .flat_map(|vevent| vevent.properties.iter())
+            .filter(|p| p.name == "ORGANIZER" || p.name == "ATTENDEE")
+        {
+            assert_eq!(
+                participant.param("SCHEDULE-AGENT"),
+                Some("CLIENT"),
+                "{path}: {} {}",
+                participant.name,
+                participant.value
+            );
+        }
+    }
+    let sequence_of = |uid_prefix: &str| {
+        let (_, ics) = stdin_events
+            .iter()
+            .find(|(path, _)| path.contains(uid_prefix))
+            .unwrap();
+        ical::parse_ical_data(ics).unwrap().sequence
+    };
+    // Test 07: updates arrive as sequence 0, 3, 4, 2, 1. The server must keep 4,
+    // which only works if the stored sequence is read back correctly.
+    assert_eq!(sequence_of("FD5688352A1F9347AAD14BB6A7C46727"), 4);
+    // Test 19: a UID with a space becomes a percent-encoded resource name.
+    assert!(
+        stdin_events.keys().any(|path| path.contains("%20")),
+        "{:?}",
+        stdin_events.keys()
+    );
+    // Tests 05 and 06: replies update the invitation instead of replacing it.
+    let (_, test_5) = stdin_events
+        .iter()
+        .find(|(path, _)| path.contains("0e4a0959"))
+        .unwrap();
+    assert!(test_5.contains("SUMMARY:Test 5"));
+    assert!(test_5.contains("PARTSTAT=ACCEPTED"));
+
+    let _ = std::fs::remove_dir_all(empty_config);
+    let _ = std::fs::remove_dir_all(with_config);
+}
+
+#[test]
+fn event_stored_under_another_name_is_updated_in_place() {
+    // An event that a calendar client or the server put into the calendar
+    // does not have to be named after its UID.
+    let server = FakeCalDav::start();
+    let config = config_home("other-name");
+    let other_name = format!("{CALENDAR}client-chosen-name.ics");
+    let invitation =
+        calmailproc::email::parse(&std::fs::read("test/maildir/cur/test-01-1.eml").unwrap())
+            .unwrap()
+            .event
+            .unwrap();
+    server
+        .store
+        .lock()
+        .unwrap()
+        .insert(other_name.clone(), invitation.raw_data.clone());
+
+    // The cancellation for that event.
+    let cancellation = std::fs::read("test/maildir/cur/test-01-2.eml").unwrap();
+    let output = run(&server.args(), Some(&cancellation), &config);
+    assert_eq!(output.status.code(), Some(0), "{}", text(&output.stderr));
+    assert!(
+        text(&output.stdout).starts_with("Updated event with UID "),
+        "{} {}",
+        text(&output.stdout),
+        text(&output.stderr)
+    );
+
+    let events = server.events();
+    assert_eq!(
+        events.keys().collect::<Vec<_>>(),
+        [&other_name],
+        "updated where it was found, no second resource"
+    );
+    let stored = ical::decode(&events[&other_name]).unwrap();
+    let vevent = stored.events().next().unwrap();
+    assert_eq!(vevent.value("STATUS"), Some("CANCELLED"));
+    // The event was on the server without SCHEDULE-AGENT and stays that way.
+    assert!(
+        vevent
+            .properties
+            .iter()
+            .all(|p| p.param("SCHEDULE-AGENT").is_none())
+    );
+    let _ = std::fs::remove_dir_all(config);
+}
+
+#[test]
+#[cfg(unix)]
+fn password_from_a_command() {
+    let server = FakeCalDav::start();
+    let config = config_home("pass-cmd");
+    let mail = std::fs::read("test/maildir/cur/test-01-1.eml").unwrap();
+    let args_with = |pass_cmd: &str| {
+        let mut args = server.args();
+        let pass = args.iter().position(|arg| arg == "-pass").unwrap();
+        args[pass] = "-pass-cmd".to_string();
+        args[pass + 1] = pass_cmd.to_string();
+        args
+    };
+
+    // The command prints the password. It must not swallow the mail, which
+    // arrives on the same standard input: `cat` would, if it could read it.
+    let output = run(
+        &args_with("cat >/dev/null; echo pass"),
+        Some(&mail),
+        &config,
+    );
+    assert_eq!(output.status.code(), Some(0), "{}", text(&output.stderr));
+    assert!(text(&output.stdout).starts_with("Stored new event with UID "));
+    assert_eq!(server.events().len(), 1);
+
+    // From the config file.
+    let other = FakeCalDav::start();
+    std::fs::write(
+        config.join("calmailproc").join("config.yaml"),
+        format!(
+            "webdav:\n  url: {}\n  user: test\n  pass_cmd: \"printf '%s' pa; echo ss\"\n  calendar: {CALENDAR}\n",
+            other.url
+        ),
+    )
+    .unwrap();
+    let output = run(&[], Some(&mail), &config);
+    assert_eq!(output.status.code(), Some(0), "{}", text(&output.stderr));
+    assert_eq!(other.events().len(), 1);
+
+    // A failing command is an error before anything is sent.
+    let output = run(&args_with("echo nope >&2; exit 1"), Some(&mail), &config);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = text(&output.stderr);
+    assert!(
+        stderr.contains("nope"),
+        "the command's own message is shown: {stderr}"
+    );
+    assert!(
+        stderr.contains("Error: the password command failed"),
+        "{stderr}"
+    );
+    assert_eq!(server.events().len(), 1);
+    let _ = std::fs::remove_dir_all(config);
+}
+
+#[test]
+fn wrong_password_is_an_error() {
+    let server = FakeCalDav::start();
+    let config = config_home("auth");
+    let mut args = server.args();
+    let pass = args.iter().position(|arg| arg == "pass").unwrap();
+    args[pass] = "wrong".to_string();
+    let mail = std::fs::read("test/maildir/cur/test-01-1.eml").unwrap();
+
+    let output = run(&args, Some(&mail), &config);
+    assert_eq!(output.status.code(), Some(1));
+    let stderr = text(&output.stderr);
+    assert!(stderr.contains("looking up existing event"), "{stderr}");
+    // The status and the server's own explanation.
+    assert!(
+        stderr.contains("HTTP status 401: wrong credentials"),
+        "{stderr}"
+    );
+    assert!(server.events().is_empty());
+    let _ = std::fs::remove_dir_all(config);
+}
+
+#[test]
+fn command_line_errors_and_help() {
+    let config = config_home("cli");
+    let args = |args: &[&str]| args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+
+    let output = run(&args(&["-help"]), None, &config);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(text(&output.stdout).starts_with("Usage of calmailproc:"));
+
+    let output = run(&args(&["-version"]), None, &config);
+    assert_eq!(
+        text(&output.stdout).trim(),
+        format!("calmailproc {}", env!("CARGO_PKG_VERSION"))
+    );
+
+    let output = run(&args(&["-caldav", "http://example.com"]), None, &config);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(text(&output.stderr).starts_with("flag provided but not defined: -caldav"));
+
+    let output = run(&[], Some(b"Subject: nothing\r\n\r\nbody\r\n"), &config);
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        text(&output.stderr).trim(),
+        "Error: all CalDAV flags are required: -url, -user, -pass (or -pass-cmd), -calendar"
+    );
+
+    // A broken config file is a warning; the flags are still required then.
+    std::fs::write(
+        config.join("calmailproc").join("config.yaml"),
+        "webdav: [unclosed",
+    )
+    .unwrap();
+    let output = run(&[], None, &config);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(text(&output.stderr).starts_with("Warning: failed to load config file: "));
+    let _ = std::fs::remove_dir_all(config);
+}
